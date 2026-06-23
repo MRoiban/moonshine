@@ -214,6 +214,21 @@ void SdlInputHandler::performKeyboardShortcut(SdlKeyboardListener::Shortcut shor
         SDL_PushEvent(&quitExitEvent);
         break;
 
+    case SdlKeyboardListener::ShortcutToggleKeyboardGrab:
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Detected keyboard grab toggle combo");
+
+        // Toggle the system key capture mode
+        if (isSystemKeyCaptureActive()) {
+            m_CaptureSystemKeysMode = StreamingPreferences::CSK_OFF;
+        }
+        else {
+            m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
+        }
+
+        updateKeyboardGrabState();
+        break;
+
     case SdlKeyboardListener::ShortcutNone:
     default:
         Q_UNREACHABLE();

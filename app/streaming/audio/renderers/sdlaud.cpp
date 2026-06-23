@@ -6,9 +6,10 @@ SdlAudioRenderer::SdlAudioRenderer(int audioPlaybackThresholdMs, int audioDropTh
         : m_AudioDevice(0),
             m_AudioBuffer(nullptr),
             m_FrameSize(0),
+            m_FrameDurationMs(0),
             m_BytesPerMs(0),
-            m_AudioPlaybackThresholdMs(audioPlaybackThresholdMs),
-            m_AudioDropThresholdMs(audioDropThresholdMs),
+            m_AudioPlaybackThresholdMs(SDL_max(0, audioPlaybackThresholdMs)),
+            m_AudioDropThresholdMs(SDL_max(1, audioDropThresholdMs)),
             m_WaitingForPlaybackThreshold(audioPlaybackThresholdMs > 0)
 {
     SDL_assert(!SDL_WasInit(SDL_INIT_AUDIO));
@@ -37,6 +38,7 @@ bool SdlAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION* 
     // The buffering helps avoid audio underruns due to network jitter.
     want.samples = SDL_max(480, opusConfig->samplesPerFrame * 3);
 
+    m_FrameDurationMs = opusConfig->samplesPerFrame / (opusConfig->sampleRate / 1000);
     m_AudioDevice = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (m_AudioDevice == 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -125,8 +127,8 @@ bool SdlAudioRenderer::submitAudio(int bytesWritten)
             return false;
         }
 
-        // Only queue more samples where there are 10 frames or less in SDL's queue
-        if (SDL_GetQueuedAudioSize(m_AudioDevice) / m_FrameSize <= 10) {
+        // Only queue more samples where there is 50 ms or less in SDL's queue
+        if (SDL_GetQueuedAudioSize(m_AudioDevice) / m_FrameSize * m_FrameDurationMs <= 50) {
             break;
         }
 

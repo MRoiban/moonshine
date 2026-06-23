@@ -20,6 +20,7 @@ public:
         ShortcutPasteText,
         ShortcutTogglePointerRegionLock,
         ShortcutQuitAndExitHostApp,
+        ShortcutToggleKeyboardGrab,
     };
 
     void remapShortcut(Shortcut shortcut, SDL_Keycode keyCode, SDL_Scancode scanCode,

@@ -74,11 +74,12 @@ static int __riscv_hwprobe(struct riscv_hwprobe *pairs, size_t pair_count,
 
 Uint32 StreamUtils::getPlatformWindowFlags()
 {
-#if defined(Q_OS_DARWIN)
-    return SDL_WINDOW_METAL;
-#elif defined(HAVE_LIBPLACEBO_VULKAN)
+#if defined(HAVE_LIBPLACEBO_VULKAN)
     // We'll fall back to GL if Vulkan fails
     return SDL_WINDOW_VULKAN;
+#elif defined(Q_OS_DARWIN)
+    // Vulkan needs to supersede Metal, otherwise the Vulkan library won't be loaded
+    return SDL_WINDOW_METAL;
 #else
     return 0;
 #endif
@@ -88,6 +89,11 @@ SDL_Window* StreamUtils::createTestWindow()
 {
     SDL_Window* testWindow;
     Uint32 baseFlags = 0;
+
+    // Stop text input before creating the test window to avoid sdl2-compat
+    // starting text input on the new window. This might trigger the IME to
+    // be displayed.
+    SDL_StopTextInput();
 
     // Test windows are always hidden
     baseFlags |= SDL_WINDOW_HIDDEN;
