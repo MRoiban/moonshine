@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QRect>
 #include <QQmlEngine>
+#include <QString>
 
 class StreamingPreferences : public QObject
 {
@@ -108,6 +109,25 @@ public:
     };
     Q_ENUM(CaptureSysKeysMode);
 
+    enum MacModifierKey
+    {
+        MMK_CONTROL,
+        MMK_OPTION,
+        MMK_SHIFT,
+        MMK_COMMAND,
+        MMK_FN,
+    };
+    Q_ENUM(MacModifierKey);
+
+    enum KeyboardShortcutModifier
+    {
+        KSM_SHIFT = 0x01,
+        KSM_CTRL = 0x02,
+        KSM_ALT = 0x04,
+        KSM_META = 0x08,
+    };
+    Q_ENUM(KeyboardShortcutModifier);
+
     Q_PROPERTY(int width MEMBER width NOTIFY displayModeChanged)
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
@@ -143,10 +163,21 @@ public:
     Q_PROPERTY(bool reverseScrollDirection MEMBER reverseScrollDirection NOTIFY reverseScrollDirectionChanged)
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
     Q_PROPERTY(bool keepAwake MEMBER keepAwake NOTIFY keepAwakeChanged)
+    Q_PROPERTY(int audioPlaybackThresholdMs MEMBER audioPlaybackThresholdMs NOTIFY audioPlaybackThresholdMsChanged)
+    Q_PROPERTY(int audioDropThresholdMs MEMBER audioDropThresholdMs NOTIFY audioDropThresholdMsChanged)
     Q_PROPERTY(CaptureSysKeysMode captureSysKeysMode MEMBER captureSysKeysMode NOTIFY captureSysKeysModeChanged)
     Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged);
+    Q_PROPERTY(MacModifierKey macCtrlMapping MEMBER macCtrlMapping NOTIFY macModifierMappingChanged)
+    Q_PROPERTY(MacModifierKey macAltMapping MEMBER macAltMapping NOTIFY macModifierMappingChanged)
+    Q_PROPERTY(MacModifierKey macShiftMapping MEMBER macShiftMapping NOTIFY macModifierMappingChanged)
+    Q_PROPERTY(MacModifierKey macMetaMapping MEMBER macMetaMapping NOTIFY macModifierMappingChanged)
+    Q_PROPERTY(bool disableCtrlEscStartMenu MEMBER disableCtrlEscStartMenu NOTIFY ctrlEscBehaviorChanged)
+    Q_PROPERTY(QString activeStreamQuitShortcutKey MEMBER activeStreamQuitShortcutKey NOTIFY activeStreamQuitShortcutChanged)
+    Q_PROPERTY(int activeStreamQuitShortcutModifiers MEMBER activeStreamQuitShortcutModifiers NOTIFY activeStreamQuitShortcutChanged)
 
     Q_INVOKABLE bool retranslate();
+    Q_INVOKABLE QString getActiveStreamQuitShortcutText() const;
+    Q_INVOKABLE void resetActiveStreamQuitShortcut();
 
     // Directly accessible members for preferences
     int width;
@@ -176,6 +207,8 @@ public:
     bool reverseScrollDirection;
     bool swapFaceButtons;
     bool keepAwake;
+    int audioPlaybackThresholdMs;
+    int audioDropThresholdMs;
     int packetSize;
     AudioConfig audioConfig;
     VideoCodecConfig videoCodecConfig;
@@ -187,6 +220,13 @@ public:
     UIDisplayMode uiDisplayMode;
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
+    MacModifierKey macCtrlMapping;
+    MacModifierKey macAltMapping;
+    MacModifierKey macShiftMapping;
+    MacModifierKey macMetaMapping;
+    bool disableCtrlEscStartMenu;
+    QString activeStreamQuitShortcutKey;
+    int activeStreamQuitShortcutModifiers;
 
 signals:
     void displayModeChanged();
@@ -223,7 +263,12 @@ signals:
     void swapFaceButtonsChanged();
     void captureSysKeysModeChanged();
     void keepAwakeChanged();
+    void audioPlaybackThresholdMsChanged();
+    void audioDropThresholdMsChanged();
     void languageChanged();
+    void macModifierMappingChanged();
+    void ctrlEscBehaviorChanged();
+    void activeStreamQuitShortcutChanged();
 
 private:
     explicit StreamingPreferences(QQmlEngine *qmlEngine);
@@ -232,4 +277,3 @@ private:
 
     QQmlEngine* m_QmlEngine;
 };
-

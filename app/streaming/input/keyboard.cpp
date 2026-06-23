@@ -13,10 +13,71 @@
 #define VK_NUMPAD0 0x60
 #endif
 
-void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
+#ifdef Q_OS_DARWIN
+static bool isMacPhysicalModifierActive(SDL_Keymod mods, StreamingPreferences::MacModifierKey key)
 {
-    switch (combo) {
-    case KeyComboQuit:
+    switch (key) {
+    case StreamingPreferences::MMK_CONTROL:
+        return (mods & KMOD_CTRL) != 0;
+    case StreamingPreferences::MMK_OPTION:
+        return (mods & KMOD_ALT) != 0;
+    case StreamingPreferences::MMK_SHIFT:
+        return (mods & KMOD_SHIFT) != 0;
+    case StreamingPreferences::MMK_COMMAND:
+        return (mods & KMOD_GUI) != 0;
+    case StreamingPreferences::MMK_FN:
+        return (mods & KMOD_MODE) != 0;
+    }
+
+    return false;
+}
+
+static bool getMacPhysicalModifierForScancode(SDL_Scancode scancode,
+                                              StreamingPreferences::MacModifierKey* physicalKey,
+                                              bool* isLeft)
+{
+    switch (scancode) {
+    case SDL_SCANCODE_LCTRL:
+    case SDL_SCANCODE_RCTRL:
+        *physicalKey = StreamingPreferences::MMK_CONTROL;
+        break;
+    case SDL_SCANCODE_LALT:
+    case SDL_SCANCODE_RALT:
+        *physicalKey = StreamingPreferences::MMK_OPTION;
+        break;
+    case SDL_SCANCODE_LSHIFT:
+    case SDL_SCANCODE_RSHIFT:
+        *physicalKey = StreamingPreferences::MMK_SHIFT;
+        break;
+    case SDL_SCANCODE_LGUI:
+    case SDL_SCANCODE_RGUI:
+        *physicalKey = StreamingPreferences::MMK_COMMAND;
+        break;
+    case SDL_SCANCODE_MODE:
+        *physicalKey = StreamingPreferences::MMK_FN;
+        break;
+    default:
+        return false;
+    }
+
+    *isLeft = scancode == SDL_SCANCODE_LSHIFT ||
+              scancode == SDL_SCANCODE_LCTRL ||
+              scancode == SDL_SCANCODE_LALT ||
+              scancode == SDL_SCANCODE_LGUI ||
+              scancode == SDL_SCANCODE_MODE;
+    return true;
+}
+
+static bool macPhysicalModifierRequiresSystemKeyCapture(StreamingPreferences::MacModifierKey key)
+{
+    return key == StreamingPreferences::MMK_COMMAND;
+}
+#endif
+
+void SdlInputHandler::performKeyboardShortcut(SdlKeyboardListener::Shortcut shortcut)
+{
+    switch (shortcut) {
+    case SdlKeyboardListener::ShortcutQuitActiveStream:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected quit key combo");
 
@@ -27,7 +88,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         SDL_PushEvent(&event);
         break;
 
-    case KeyComboUngrabInput:
+    case SdlKeyboardListener::ShortcutUngrabInput:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected mouse capture toggle combo");
 
@@ -39,7 +100,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         raiseAllKeys();
         break;
 
-    case KeyComboToggleFullScreen:
+    case SdlKeyboardListener::ShortcutToggleFullScreen:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected full-screen toggle combo");
         Session::s_ActiveSession->toggleFullscreen();
@@ -49,7 +110,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         raiseAllKeys();
         break;
 
-    case KeyComboToggleStatsOverlay:
+    case SdlKeyboardListener::ShortcutToggleStatsOverlay:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected stats toggle combo");
 
@@ -58,7 +119,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
                                                             !Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug));
         break;
 
-    case KeyComboToggleMouseMode:
+    case SdlKeyboardListener::ShortcutToggleMouseMode:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected mouse mode toggle combo");
 
@@ -72,7 +133,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         setCaptureActive(true);
         break;
 
-    case KeyComboToggleCursorHide:
+    case SdlKeyboardListener::ShortcutToggleCursorHide:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected show mouse combo");
 
@@ -86,13 +147,13 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         }
         break;
 
-    case KeyComboToggleMinimize:
+    case SdlKeyboardListener::ShortcutToggleMinimize:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected minimize combo");
         SDL_MinimizeWindow(m_Window);
         break;
 
-    case KeyComboPasteText:
+    case SdlKeyboardListener::ShortcutPasteText:
     {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected type clipboard text combo");
@@ -126,7 +187,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         break;
     }
 
-    case KeyComboTogglePointerRegionLock:
+    case SdlKeyboardListener::ShortcutTogglePointerRegionLock:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected pointer region lock toggle combo");
         m_PointerRegionLockActive = !m_PointerRegionLockActive;
@@ -139,7 +200,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         updatePointerRegionLock();
         break;
 
-    case KeyComboQuitAndExit:
+    case SdlKeyboardListener::ShortcutQuitAndExitHostApp:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected quitAndExit key combo");
 
@@ -153,6 +214,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         SDL_PushEvent(&quitExitEvent);
         break;
 
+    case SdlKeyboardListener::ShortcutNone:
     default:
         Q_UNREACHABLE();
     }
@@ -170,39 +232,58 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         return;
     }
 
-    // Check for our special key combos
-    if ((event->state == SDL_PRESSED) &&
-            (event->keysym.mod & KMOD_CTRL) &&
-            (event->keysym.mod & KMOD_ALT) &&
-            (event->keysym.mod & KMOD_SHIFT)) {
-        // First we test the SDLK combos for matches,
-        // that way we ensure that latin keyboard users
-        // can match to the key they see on their keyboards.
-        // If nothing matches that, we'll then go on to
-        // checking scancodes so non-latin keyboard users
-        // can have working hotkeys (though possibly in
-        // odd positions). We must do all SDLK tests before
-        // any scancode tests to avoid issues in cases
-        // where the SDLK for one shortcut collides with
-        // the scancode of another.
+#ifdef Q_OS_DARWIN
+    auto mappedMacModifierForPhysicalKey = [this](StreamingPreferences::MacModifierKey physicalKey) {
+        if (m_MacMetaMapping == physicalKey) {
+            return !macPhysicalModifierRequiresSystemKeyCapture(physicalKey) || isSystemKeyCaptureActive() ?
+                        MODIFIER_META : 0;
+        }
+        if (m_MacCtrlMapping == physicalKey) {
+            return MODIFIER_CTRL;
+        }
+        if (m_MacAltMapping == physicalKey) {
+            return MODIFIER_ALT;
+        }
+        if (m_MacShiftMapping == physicalKey) {
+            return MODIFIER_SHIFT;
+        }
 
-        for (int i = 0; i < KeyComboMax; i++) {
-            if (m_SpecialKeyCombos[i].enabled && event->keysym.sym == m_SpecialKeyCombos[i].keyCode) {
-                performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo);
-                return;
+        return 0;
+    };
+
+    auto mappedMacModifiers = [mappedMacModifierForPhysicalKey](SDL_Keymod mods) {
+        char mappedModifiers = 0;
+        const StreamingPreferences::MacModifierKey physicalKeys[] = {
+            StreamingPreferences::MMK_CONTROL,
+            StreamingPreferences::MMK_OPTION,
+            StreamingPreferences::MMK_SHIFT,
+            StreamingPreferences::MMK_COMMAND,
+            StreamingPreferences::MMK_FN,
+        };
+
+        for (StreamingPreferences::MacModifierKey physicalKey : physicalKeys) {
+            if (isMacPhysicalModifierActive(mods, physicalKey)) {
+                mappedModifiers |= mappedMacModifierForPhysicalKey(physicalKey);
             }
         }
 
-        for (int i = 0; i < KeyComboMax; i++) {
-            if (m_SpecialKeyCombos[i].enabled && event->keysym.scancode == m_SpecialKeyCombos[i].scanCode) {
-                performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo);
-                return;
-            }
-        }
-    }
+        return mappedModifiers;
+    };
+
+    const char mappedModifiers = mappedMacModifiers(static_cast<SDL_Keymod>(event->keysym.mod));
+#endif
 
     // Set modifier flags
     modifiers = 0;
+#ifdef Q_OS_DARWIN
+    modifiers = mappedModifiers;
+
+    if (m_DisableCtrlEscStartMenu &&
+        event->keysym.scancode == SDL_SCANCODE_ESCAPE &&
+        (modifiers & MODIFIER_CTRL)) {
+        return;
+    }
+#else
     if (event->keysym.mod & KMOD_CTRL) {
         modifiers |= MODIFIER_CTRL;
     }
@@ -216,6 +297,13 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         if (isSystemKeyCaptureActive()) {
             modifiers |= MODIFIER_META;
         }
+    }
+#endif
+
+    SdlKeyboardListener::Shortcut shortcut = m_KeyboardListener.matchKeyPress(event, modifiers);
+    if (shortcut != SdlKeyboardListener::ShortcutNone) {
+        performKeyboardShortcut(shortcut);
+        return;
     }
 
     // Set keycode. We explicitly use scancode here because GFE will try to correct
@@ -339,6 +427,44 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
             case SDL_SCANCODE_SCROLLLOCK:
                 keyCode = 0x91;
                 break;
+#ifdef Q_OS_DARWIN
+            case SDL_SCANCODE_LSHIFT:
+            case SDL_SCANCODE_RSHIFT:
+            case SDL_SCANCODE_LCTRL:
+            case SDL_SCANCODE_RCTRL:
+            case SDL_SCANCODE_LALT:
+            case SDL_SCANCODE_RALT:
+            case SDL_SCANCODE_LGUI:
+            case SDL_SCANCODE_RGUI:
+            case SDL_SCANCODE_MODE:
+            {
+                StreamingPreferences::MacModifierKey physicalKey;
+                bool isLeft;
+                if (!getMacPhysicalModifierForScancode(event->keysym.scancode, &physicalKey, &isLeft)) {
+                    return;
+                }
+
+                if (m_MacMetaMapping == physicalKey) {
+                    if (macPhysicalModifierRequiresSystemKeyCapture(physicalKey) && !isSystemKeyCaptureActive()) {
+                        return;
+                    }
+                    keyCode = isLeft ? 0x5B : 0x5C;
+                }
+                else if (m_MacCtrlMapping == physicalKey) {
+                    keyCode = isLeft ? 0xA2 : 0xA3;
+                }
+                else if (m_MacAltMapping == physicalKey) {
+                    keyCode = isLeft ? 0xA4 : 0xA5;
+                }
+                else if (m_MacShiftMapping == physicalKey) {
+                    keyCode = isLeft ? 0xA0 : 0xA1;
+                }
+                else {
+                    return;
+                }
+                break;
+            }
+#else
             case SDL_SCANCODE_LSHIFT:
                 keyCode = 0xA0;
                 break;
@@ -369,6 +495,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 }
                 keyCode = 0x5C;
                 break;
+#endif
             case SDL_SCANCODE_APPLICATION:
                 keyCode = 0x5D;
                 break;

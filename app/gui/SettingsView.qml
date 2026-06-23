@@ -42,6 +42,53 @@ Flickable {
         duration: 100
     }
 
+    function commitAudioThresholdSettings() {
+        if (audioPlaybackThresholdField.acceptableInput) {
+            StreamingPreferences.audioPlaybackThresholdMs = parseInt(audioPlaybackThresholdField.text)
+            audioPlaybackThresholdField.text = StreamingPreferences.audioPlaybackThresholdMs.toString()
+        }
+        else {
+            audioPlaybackThresholdField.text = StreamingPreferences.audioPlaybackThresholdMs.toString()
+        }
+
+        if (audioDropThresholdField.acceptableInput) {
+            StreamingPreferences.audioDropThresholdMs = parseInt(audioDropThresholdField.text)
+            audioDropThresholdField.text = StreamingPreferences.audioDropThresholdMs.toString()
+        }
+        else {
+            audioDropThresholdField.text = StreamingPreferences.audioDropThresholdMs.toString()
+        }
+    }
+
+    function commitActiveStreamQuitShortcutSettings() {
+        var keyName = activeStreamQuitShortcutKeyField.text.trim()
+        if (keyName.length === 0) {
+            keyName = "Q"
+        }
+
+        StreamingPreferences.activeStreamQuitShortcutKey = keyName
+        activeStreamQuitShortcutKeyField.text = keyName.toUpperCase()
+    }
+
+    function setActiveStreamQuitShortcutModifier(modifier, enabled) {
+        var modifiers = StreamingPreferences.activeStreamQuitShortcutModifiers
+        if (enabled) {
+            modifiers |= modifier
+        }
+        else {
+            modifiers &= ~modifier
+        }
+        StreamingPreferences.activeStreamQuitShortcutModifiers = modifiers
+    }
+
+    function refreshActiveStreamQuitShortcutControls() {
+        activeStreamQuitShortcutKeyField.text = StreamingPreferences.activeStreamQuitShortcutKey
+        activeQuitCtrlCheck.checked = (StreamingPreferences.activeStreamQuitShortcutModifiers & StreamingPreferences.KSM_CTRL) !== 0
+        activeQuitAltCheck.checked = (StreamingPreferences.activeStreamQuitShortcutModifiers & StreamingPreferences.KSM_ALT) !== 0
+        activeQuitShiftCheck.checked = (StreamingPreferences.activeStreamQuitShortcutModifiers & StreamingPreferences.KSM_SHIFT) !== 0
+        activeQuitMetaCheck.checked = (StreamingPreferences.activeStreamQuitShortcutModifiers & StreamingPreferences.KSM_META) !== 0
+    }
+
     Window.onActiveFocusItemChanged: {
         var item = Window.activeFocusItem
         if (item) {
@@ -84,12 +131,16 @@ Flickable {
         SdlGamepadKeyNavigation.setUiNavMode(false)
 
         // Save the prefs so the Session can observe the changes
+        commitAudioThresholdSettings()
+        commitActiveStreamQuitShortcutSettings()
         StreamingPreferences.save()
     }
 
     Component.onDestruction: {
         // Also save preferences on destruction, since we won't get a
         // deactivating callback if the user just closes Moonlight
+        commitAudioThresholdSettings()
+        commitActiveStreamQuitShortcutSettings()
         StreamingPreferences.save()
     }
 
@@ -906,6 +957,56 @@ Flickable {
                     }
                 }
 
+                Label {
+                    width: parent.width
+                    text: qsTr("SDL audio: queued audio before playback starts or resumes (ms)")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                TextField {
+                    id: audioPlaybackThresholdField
+                    width: Math.min(parent.width, 120)
+                    text: StreamingPreferences.audioPlaybackThresholdMs.toString()
+                    maximumLength: 4
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    validator: IntValidator { bottom: 0; top: 1000 }
+
+                    onEditingFinished: {
+                        commitAudioThresholdSettings()
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("SDL audio only. Default: 0 ms. Set this above 0 if you want Moonlight to wait for buffered SDL audio before starting playback or resuming after an underrun.")
+                }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("SDL audio: maximum queued audio in Moonlight's buffer (ms)")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                TextField {
+                    id: audioDropThresholdField
+                    width: Math.min(parent.width, 120)
+                    text: StreamingPreferences.audioDropThresholdMs.toString()
+                    maximumLength: 4
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    validator: IntValidator { bottom: 1; top: 1000 }
+
+                    onEditingFinished: {
+                        commitAudioThresholdSettings()
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("SDL audio only. Default: 30 ms. Increase this if you want Moonlight to tolerate more queued audio before dropping new samples.")
+                }
+
 
                 CheckBox {
                     id: audioPcCheck
@@ -1394,6 +1495,251 @@ Flickable {
                             updatePref()
                         }
                     }
+                }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Disconnect session keyboard shortcut")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 8
+
+                    TextField {
+                        id: activeStreamQuitShortcutKeyField
+                        width: Math.min(parent.width, 120)
+                        text: StreamingPreferences.activeStreamQuitShortcutKey
+                        maximumLength: 24
+                        inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+
+                        onEditingFinished: {
+                            commitActiveStreamQuitShortcutSettings()
+                        }
+
+                        Keys.onReturnPressed: {
+                            commitActiveStreamQuitShortcutSettings()
+                        }
+
+                        Keys.onEnterPressed: {
+                            commitActiveStreamQuitShortcutSettings()
+                        }
+
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 5000
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Use SDL key names such as Q, F1, Space, Escape, or Backspace.")
+                    }
+
+                    Button {
+                        text: qsTr("Reset")
+                        onClicked: {
+                            StreamingPreferences.resetActiveStreamQuitShortcut()
+                            refreshActiveStreamQuitShortcutControls()
+                        }
+                    }
+                }
+
+                Flow {
+                    width: parent.width
+                    spacing: 8
+
+                    CheckBox {
+                        id: activeQuitCtrlCheck
+                        text: qsTr("Ctrl")
+                        font.pointSize: 11
+                        checked: (StreamingPreferences.activeStreamQuitShortcutModifiers & StreamingPreferences.KSM_CTRL) !== 0
+                        onCheckedChanged: {
+                            setActiveStreamQuitShortcutModifier(StreamingPreferences.KSM_CTRL, checked)
+                        }
+                    }
+
+                    CheckBox {
+                        id: activeQuitAltCheck
+                        text: qsTr("Alt")
+                        font.pointSize: 11
+                        checked: (StreamingPreferences.activeStreamQuitShortcutModifiers & StreamingPreferences.KSM_ALT) !== 0
+                        onCheckedChanged: {
+                            setActiveStreamQuitShortcutModifier(StreamingPreferences.KSM_ALT, checked)
+                        }
+                    }
+
+                    CheckBox {
+                        id: activeQuitShiftCheck
+                        text: qsTr("Shift")
+                        font.pointSize: 11
+                        checked: (StreamingPreferences.activeStreamQuitShortcutModifiers & StreamingPreferences.KSM_SHIFT) !== 0
+                        onCheckedChanged: {
+                            setActiveStreamQuitShortcutModifier(StreamingPreferences.KSM_SHIFT, checked)
+                        }
+                    }
+
+                    CheckBox {
+                        id: activeQuitMetaCheck
+                        text: qsTr("Windows")
+                        font.pointSize: 11
+                        checked: (StreamingPreferences.activeStreamQuitShortcutModifiers & StreamingPreferences.KSM_META) !== 0
+                        onCheckedChanged: {
+                            setActiveStreamQuitShortcutModifier(StreamingPreferences.KSM_META, checked)
+                        }
+                    }
+                }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Modifier key mapping (macOS)")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                    visible: Qt.platform.os === "osx"
+                }
+
+                GridLayout {
+                    id: macModifierMappingGrid
+                    width: parent.width
+                    columns: 2
+                    columnSpacing: 8
+                    rowSpacing: 6
+                    visible: Qt.platform.os === "osx"
+
+                    ListModel {
+                        id: macModifierKeyListModel
+                        ListElement {
+                            text: qsTr("Control")
+                            val: StreamingPreferences.MMK_CONTROL
+                        }
+                        ListElement {
+                            text: qsTr("Option")
+                            val: StreamingPreferences.MMK_OPTION
+                        }
+                        ListElement {
+                            text: qsTr("Command")
+                            val: StreamingPreferences.MMK_COMMAND
+                        }
+                        ListElement {
+                            text: qsTr("Shift")
+                            val: StreamingPreferences.MMK_SHIFT
+                        }
+                        ListElement {
+                            text: qsTr("Fn")
+                            val: StreamingPreferences.MMK_FN
+                        }
+                    }
+
+                    Label {
+                        text: qsTr("Ctrl")
+                        font.pointSize: 11
+                    }
+
+                    AutoResizingComboBox {
+                        textRole: "text"
+                        model: macModifierKeyListModel
+                        Component.onCompleted: {
+                            var saved = StreamingPreferences.macCtrlMapping
+                            currentIndex = 0
+                            for (var i = 0; i < macModifierKeyListModel.count; i++) {
+                                if (macModifierKeyListModel.get(i).val === saved) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
+                            activated(currentIndex)
+                        }
+                        onActivated: {
+                            StreamingPreferences.macCtrlMapping = macModifierKeyListModel.get(currentIndex).val
+                        }
+                    }
+
+                    Label {
+                        text: qsTr("Alt")
+                        font.pointSize: 11
+                    }
+
+                    AutoResizingComboBox {
+                        textRole: "text"
+                        model: macModifierKeyListModel
+                        Component.onCompleted: {
+                            var saved = StreamingPreferences.macAltMapping
+                            currentIndex = 0
+                            for (var i = 0; i < macModifierKeyListModel.count; i++) {
+                                if (macModifierKeyListModel.get(i).val === saved) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
+                            activated(currentIndex)
+                        }
+                        onActivated: {
+                            StreamingPreferences.macAltMapping = macModifierKeyListModel.get(currentIndex).val
+                        }
+                    }
+
+                    Label {
+                        text: qsTr("Shift")
+                        font.pointSize: 11
+                    }
+
+                    AutoResizingComboBox {
+                        textRole: "text"
+                        model: macModifierKeyListModel
+                        Component.onCompleted: {
+                            var saved = StreamingPreferences.macShiftMapping
+                            currentIndex = 0
+                            for (var i = 0; i < macModifierKeyListModel.count; i++) {
+                                if (macModifierKeyListModel.get(i).val === saved) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
+                            activated(currentIndex)
+                        }
+                        onActivated: {
+                            StreamingPreferences.macShiftMapping = macModifierKeyListModel.get(currentIndex).val
+                        }
+                    }
+
+                    Label {
+                        text: qsTr("Windows")
+                        font.pointSize: 11
+                    }
+
+                    AutoResizingComboBox {
+                        textRole: "text"
+                        model: macModifierKeyListModel
+                        Component.onCompleted: {
+                            var saved = StreamingPreferences.macMetaMapping
+                            currentIndex = 0
+                            for (var i = 0; i < macModifierKeyListModel.count; i++) {
+                                if (macModifierKeyListModel.get(i).val === saved) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
+                            activated(currentIndex)
+                        }
+                        onActivated: {
+                            StreamingPreferences.macMetaMapping = macModifierKeyListModel.get(currentIndex).val
+                        }
+                    }
+                }
+
+                CheckBox {
+                    id: disableCtrlEscCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Disable Ctrl+Esc start menu shortcut")
+                    font.pointSize: 12
+                    visible: Qt.platform.os === "osx"
+                    checked: StreamingPreferences.disableCtrlEscStartMenu
+                    onCheckedChanged: {
+                        StreamingPreferences.disableCtrlEscStartMenu = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Prevents Ctrl+Esc from being sent to the host. Use the Windows key mapping instead.")
                 }
 
                 CheckBox {

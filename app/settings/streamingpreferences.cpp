@@ -6,7 +6,9 @@
 #include <QCoreApplication>
 #include <QLocale>
 #include <QReadWriteLock>
+#include <QStringList>
 #include <QtMath>
+#include <QtGlobal>
 
 #include <QtDebug>
 
@@ -50,9 +52,57 @@
 #define SER_SWAPFACEBUTTONS "swapfacebuttons"
 #define SER_CAPTURESYSKEYS "capturesyskeys"
 #define SER_KEEPAWAKE "keepawake"
+#define SER_AUDIOPLAYBACKTHRESHOLDMS "audioplaybackthresholdms"
+#define SER_AUDIODROPTHRESHOLDMS "audiodropthresholdms"
+#define SER_AUDIOQUEUETHRESHOLDMS "audioqueuethresholdms"
 #define SER_LANGUAGE "language"
+#define SER_MACMOD_CTRL "macmodctrl"
+#define SER_MACMOD_ALT "macmodalt"
+#define SER_MACMOD_SHIFT "macmodshift"
+#define SER_MACMOD_META "macmodmeta"
+#define SER_DISABLECTRLESC "disablectrlesc"
+#define SER_ACTIVEQUITSHORTCUTKEY "activequitshortcutkey"
+#define SER_ACTIVEQUITSHORTCUTMODIFIERS "activequitshortcutmodifiers"
 
 #define CURRENT_DEFAULT_VER 2
+
+namespace {
+constexpr int kDefaultAudioPlaybackThresholdMs = 0;
+constexpr int kDefaultAudioDropThresholdMs = 30;
+constexpr int kMinimumAudioPlaybackThresholdMs = 0;
+constexpr int kMinimumAudioDropThresholdMs = 1;
+constexpr int kMaximumAudioThresholdMs = 1000;
+constexpr int kShortcutModifierMask = StreamingPreferences::KSM_SHIFT |
+                                      StreamingPreferences::KSM_CTRL |
+                                      StreamingPreferences::KSM_ALT |
+                                      StreamingPreferences::KSM_META;
+constexpr int kDefaultActiveStreamQuitShortcutModifiers = StreamingPreferences::KSM_CTRL |
+                                                          StreamingPreferences::KSM_ALT |
+                                                          StreamingPreferences::KSM_SHIFT;
+const char kDefaultActiveStreamQuitShortcutKey[] = "Q";
+
+int clampAudioPlaybackThreshold(int value)
+{
+    return qBound(kMinimumAudioPlaybackThresholdMs, value, kMaximumAudioThresholdMs);
+}
+
+int clampAudioDropThreshold(int value)
+{
+    return qBound(kMinimumAudioDropThresholdMs, value, kMaximumAudioThresholdMs);
+}
+
+QString sanitizeShortcutKey(QString key)
+{
+    key = key.trimmed();
+    return key.isEmpty() ? QString::fromLatin1(kDefaultActiveStreamQuitShortcutKey) : key;
+}
+
+int sanitizeShortcutModifiers(int modifiers)
+{
+    modifiers &= kShortcutModifierMask;
+    return modifiers == 0 ? kDefaultActiveStreamQuitShortcutModifiers : modifiers;
+}
+}
 
 static StreamingPreferences* s_GlobalPrefs;
 
@@ -150,6 +200,11 @@ void StreamingPreferences::reload()
     reverseScrollDirection = settings.value(SER_REVERSESCROLL, false).toBool();
     swapFaceButtons = settings.value(SER_SWAPFACEBUTTONS, false).toBool();
     keepAwake = settings.value(SER_KEEPAWAKE, true).toBool();
+    audioPlaybackThresholdMs = clampAudioPlaybackThreshold(settings.value(SER_AUDIOPLAYBACKTHRESHOLDMS,
+                                                                          kDefaultAudioPlaybackThresholdMs).toInt());
+    audioDropThresholdMs = clampAudioDropThreshold(settings.value(SER_AUDIODROPTHRESHOLDMS,
+                                                                  settings.value(SER_AUDIOQUEUETHRESHOLDMS,
+                                                                                 kDefaultAudioDropThresholdMs).toInt()).toInt());
     enableHdr = settings.value(SER_HDR, false).toBool();
     captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS,
                                                          static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
@@ -168,6 +223,19 @@ void StreamingPreferences::reload()
                                                                                                                  : UIDisplayMode::UI_MAXIMIZED)).toInt());
     language = static_cast<Language>(settings.value(SER_LANGUAGE,
                                                     static_cast<int>(Language::LANG_AUTO)).toInt());
+    macCtrlMapping = static_cast<MacModifierKey>(settings.value(SER_MACMOD_CTRL,
+                                                     static_cast<int>(MacModifierKey::MMK_CONTROL)).toInt());
+    macAltMapping = static_cast<MacModifierKey>(settings.value(SER_MACMOD_ALT,
+                                                    static_cast<int>(MacModifierKey::MMK_OPTION)).toInt());
+    macShiftMapping = static_cast<MacModifierKey>(settings.value(SER_MACMOD_SHIFT,
+                                                      static_cast<int>(MacModifierKey::MMK_SHIFT)).toInt());
+    macMetaMapping = static_cast<MacModifierKey>(settings.value(SER_MACMOD_META,
+                                                     static_cast<int>(MacModifierKey::MMK_COMMAND)).toInt());
+    disableCtrlEscStartMenu = settings.value(SER_DISABLECTRLESC, false).toBool();
+    activeStreamQuitShortcutKey = sanitizeShortcutKey(settings.value(SER_ACTIVEQUITSHORTCUTKEY,
+                                                                     kDefaultActiveStreamQuitShortcutKey).toString());
+    activeStreamQuitShortcutModifiers = sanitizeShortcutModifiers(settings.value(SER_ACTIVEQUITSHORTCUTMODIFIERS,
+                                                                                kDefaultActiveStreamQuitShortcutModifiers).toInt());
 
 
     // Perform default settings updates as required based on last default version
@@ -316,6 +384,35 @@ QString StreamingPreferences::getSuffixFromLanguage(StreamingPreferences::Langua
     }
 }
 
+QString StreamingPreferences::getActiveStreamQuitShortcutText() const
+{
+    QStringList keys;
+    const int modifiers = sanitizeShortcutModifiers(activeStreamQuitShortcutModifiers);
+
+    if (modifiers & KSM_CTRL) {
+        keys.append(QStringLiteral("Ctrl"));
+    }
+    if (modifiers & KSM_ALT) {
+        keys.append(QStringLiteral("Alt"));
+    }
+    if (modifiers & KSM_SHIFT) {
+        keys.append(QStringLiteral("Shift"));
+    }
+    if (modifiers & KSM_META) {
+        keys.append(QStringLiteral("Win"));
+    }
+
+    keys.append(sanitizeShortcutKey(activeStreamQuitShortcutKey).toUpper());
+    return keys.join(QStringLiteral("+"));
+}
+
+void StreamingPreferences::resetActiveStreamQuitShortcut()
+{
+    activeStreamQuitShortcutKey = QString::fromLatin1(kDefaultActiveStreamQuitShortcutKey);
+    activeStreamQuitShortcutModifiers = kDefaultActiveStreamQuitShortcutModifiers;
+    emit activeStreamQuitShortcutChanged();
+}
+
 void StreamingPreferences::save()
 {
     QSettings settings;
@@ -358,6 +455,16 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
+    settings.setValue(SER_AUDIOPLAYBACKTHRESHOLDMS, clampAudioPlaybackThreshold(audioPlaybackThresholdMs));
+    settings.setValue(SER_AUDIODROPTHRESHOLDMS, clampAudioDropThreshold(audioDropThresholdMs));
+    settings.setValue(SER_AUDIOQUEUETHRESHOLDMS, clampAudioDropThreshold(audioDropThresholdMs));
+    settings.setValue(SER_MACMOD_CTRL, static_cast<int>(macCtrlMapping));
+    settings.setValue(SER_MACMOD_ALT, static_cast<int>(macAltMapping));
+    settings.setValue(SER_MACMOD_SHIFT, static_cast<int>(macShiftMapping));
+    settings.setValue(SER_MACMOD_META, static_cast<int>(macMetaMapping));
+    settings.setValue(SER_DISABLECTRLESC, disableCtrlEscStartMenu);
+    settings.setValue(SER_ACTIVEQUITSHORTCUTKEY, sanitizeShortcutKey(activeStreamQuitShortcutKey));
+    settings.setValue(SER_ACTIVEQUITSHORTCUTMODIFIERS, sanitizeShortcutModifiers(activeStreamQuitShortcutModifiers));
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

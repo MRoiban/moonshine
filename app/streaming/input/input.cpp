@@ -21,6 +21,11 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_PointerRegionLockToggledByUser(false),
       m_FakeCaptureActive(false),
       m_CaptureSystemKeysMode(prefs.captureSysKeysMode),
+      m_MacCtrlMapping(prefs.macCtrlMapping),
+      m_MacAltMapping(prefs.macAltMapping),
+      m_MacShiftMapping(prefs.macShiftMapping),
+      m_MacMetaMapping(prefs.macMetaMapping),
+      m_DisableCtrlEscStartMenu(prefs.disableCtrlEscStartMenu),
       m_MouseCursorCapturedVisibilityState(SDL_DISABLE),
       m_LongPressTimer(0),
       m_StreamWidth(streamWidth),
@@ -65,56 +70,38 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS4_RUMBLE, "1");
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS5_RUMBLE, "1");
 
-    // Populate special key combo configuration
-    m_SpecialKeyCombos[KeyComboQuit].keyCombo = KeyComboQuit;
-    m_SpecialKeyCombos[KeyComboQuit].keyCode = SDLK_q;
-    m_SpecialKeyCombos[KeyComboQuit].scanCode = SDL_SCANCODE_Q;
-    m_SpecialKeyCombos[KeyComboQuit].enabled = true;
+    const char streamShortcutModifiers = MODIFIER_CTRL | MODIFIER_ALT | MODIFIER_SHIFT;
+    char activeStreamQuitShortcutModifiers = static_cast<char>(prefs.activeStreamQuitShortcutModifiers);
+    if (activeStreamQuitShortcutModifiers == 0) {
+        activeStreamQuitShortcutModifiers = streamShortcutModifiers;
+    }
+    const bool platformAllowsWindowActions = QGuiApplication::platformName() != "eglfs";
 
-    m_SpecialKeyCombos[KeyComboUngrabInput].keyCombo = KeyComboUngrabInput;
-    m_SpecialKeyCombos[KeyComboUngrabInput].keyCode = SDLK_z;
-    m_SpecialKeyCombos[KeyComboUngrabInput].scanCode = SDL_SCANCODE_Z;
-    m_SpecialKeyCombos[KeyComboUngrabInput].enabled = QGuiApplication::platformName() != "eglfs";
-
-    m_SpecialKeyCombos[KeyComboToggleFullScreen].keyCombo = KeyComboToggleFullScreen;
-    m_SpecialKeyCombos[KeyComboToggleFullScreen].keyCode = SDLK_x;
-    m_SpecialKeyCombos[KeyComboToggleFullScreen].scanCode = SDL_SCANCODE_X;
-    m_SpecialKeyCombos[KeyComboToggleFullScreen].enabled = QGuiApplication::platformName() != "eglfs";
-
-    m_SpecialKeyCombos[KeyComboToggleStatsOverlay].keyCombo = KeyComboToggleStatsOverlay;
-    m_SpecialKeyCombos[KeyComboToggleStatsOverlay].keyCode = SDLK_s;
-    m_SpecialKeyCombos[KeyComboToggleStatsOverlay].scanCode = SDL_SCANCODE_S;
-    m_SpecialKeyCombos[KeyComboToggleStatsOverlay].enabled = true;
-
-    m_SpecialKeyCombos[KeyComboToggleMouseMode].keyCombo = KeyComboToggleMouseMode;
-    m_SpecialKeyCombos[KeyComboToggleMouseMode].keyCode = SDLK_m;
-    m_SpecialKeyCombos[KeyComboToggleMouseMode].scanCode = SDL_SCANCODE_M;
-    m_SpecialKeyCombos[KeyComboToggleMouseMode].enabled = true;
-
-    m_SpecialKeyCombos[KeyComboToggleCursorHide].keyCombo = KeyComboToggleCursorHide;
-    m_SpecialKeyCombos[KeyComboToggleCursorHide].keyCode = SDLK_c;
-    m_SpecialKeyCombos[KeyComboToggleCursorHide].scanCode = SDL_SCANCODE_C;
-    m_SpecialKeyCombos[KeyComboToggleCursorHide].enabled = true;
-
-    m_SpecialKeyCombos[KeyComboToggleMinimize].keyCombo = KeyComboToggleMinimize;
-    m_SpecialKeyCombos[KeyComboToggleMinimize].keyCode = SDLK_d;
-    m_SpecialKeyCombos[KeyComboToggleMinimize].scanCode = SDL_SCANCODE_D;
-    m_SpecialKeyCombos[KeyComboToggleMinimize].enabled = QGuiApplication::platformName() != "eglfs";
-
-    m_SpecialKeyCombos[KeyComboPasteText].keyCombo = KeyComboPasteText;
-    m_SpecialKeyCombos[KeyComboPasteText].keyCode = SDLK_v;
-    m_SpecialKeyCombos[KeyComboPasteText].scanCode = SDL_SCANCODE_V;
-    m_SpecialKeyCombos[KeyComboPasteText].enabled = true;
-
-    m_SpecialKeyCombos[KeyComboTogglePointerRegionLock].keyCombo = KeyComboTogglePointerRegionLock;
-    m_SpecialKeyCombos[KeyComboTogglePointerRegionLock].keyCode = SDLK_l;
-    m_SpecialKeyCombos[KeyComboTogglePointerRegionLock].scanCode = SDL_SCANCODE_L;
-    m_SpecialKeyCombos[KeyComboTogglePointerRegionLock].enabled = true;
-
-    m_SpecialKeyCombos[KeyComboQuitAndExit].keyCombo = KeyComboQuitAndExit;
-    m_SpecialKeyCombos[KeyComboQuitAndExit].keyCode = SDLK_e;
-    m_SpecialKeyCombos[KeyComboQuitAndExit].scanCode = SDL_SCANCODE_E;
-    m_SpecialKeyCombos[KeyComboQuitAndExit].enabled = true;
+    m_KeyboardListener.remapShortcutByName(SdlKeyboardListener::ShortcutQuitActiveStream,
+                                           prefs.activeStreamQuitShortcutKey,
+                                           activeStreamQuitShortcutModifiers,
+                                           true, SDLK_q, SDL_SCANCODE_Q);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutUngrabInput,
+                                     SDLK_z, SDL_SCANCODE_Z, streamShortcutModifiers,
+                                     platformAllowsWindowActions);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutToggleFullScreen,
+                                     SDLK_x, SDL_SCANCODE_X, streamShortcutModifiers,
+                                     platformAllowsWindowActions);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutToggleStatsOverlay,
+                                     SDLK_s, SDL_SCANCODE_S, streamShortcutModifiers);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutToggleMouseMode,
+                                     SDLK_m, SDL_SCANCODE_M, streamShortcutModifiers);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutToggleCursorHide,
+                                     SDLK_c, SDL_SCANCODE_C, streamShortcutModifiers);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutToggleMinimize,
+                                     SDLK_d, SDL_SCANCODE_D, streamShortcutModifiers,
+                                     platformAllowsWindowActions);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutPasteText,
+                                     SDLK_v, SDL_SCANCODE_V, streamShortcutModifiers);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutTogglePointerRegionLock,
+                                     SDLK_l, SDL_SCANCODE_L, streamShortcutModifiers);
+    m_KeyboardListener.remapShortcut(SdlKeyboardListener::ShortcutQuitAndExitHostApp,
+                                     SDLK_e, SDL_SCANCODE_E, streamShortcutModifiers);
 
     m_OldIgnoreDevices = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES);
     m_OldIgnoreDevicesExcept = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT);

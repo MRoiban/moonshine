@@ -2,6 +2,7 @@
 
 #include "settings/streamingpreferences.h"
 #include "backend/computermanager.h"
+#include "streaming/input/keyboardlistener.h"
 
 #include "SDL_compat.h"
 
@@ -156,20 +157,6 @@ public:
     QString getUnmappedGamepads();
 
 private:
-    enum KeyCombo {
-        KeyComboQuit,
-        KeyComboUngrabInput,
-        KeyComboToggleFullScreen,
-        KeyComboToggleStatsOverlay,
-        KeyComboToggleMouseMode,
-        KeyComboToggleCursorHide,
-        KeyComboToggleMinimize,
-        KeyComboPasteText,
-        KeyComboTogglePointerRegionLock,
-        KeyComboQuitAndExit,
-        KeyComboMax
-    };
-
     GamepadState*
     findStateForGamepad(SDL_JoystickID id);
 
@@ -185,7 +172,7 @@ private:
 
     void handleRelativeFingerEvent(SDL_TouchFingerEvent* event);
 
-    void performSpecialKeyCombo(KeyCombo combo);
+    void performKeyboardShortcut(SdlKeyboardListener::Shortcut shortcut);
 
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
@@ -222,14 +209,13 @@ private:
     QString m_OldIgnoreDevicesExcept;
     QStringList m_IgnoreDeviceGuids;
     StreamingPreferences::CaptureSysKeysMode m_CaptureSystemKeysMode;
+    StreamingPreferences::MacModifierKey m_MacCtrlMapping;
+    StreamingPreferences::MacModifierKey m_MacAltMapping;
+    StreamingPreferences::MacModifierKey m_MacShiftMapping;
+    StreamingPreferences::MacModifierKey m_MacMetaMapping;
+    bool m_DisableCtrlEscStartMenu;
     int m_MouseCursorCapturedVisibilityState;
-
-    struct {
-        KeyCombo keyCombo;
-        SDL_Keycode keyCode;
-        SDL_Scancode scanCode;
-        bool enabled;
-    } m_SpecialKeyCombos[KeyComboMax];
+    SdlKeyboardListener m_KeyboardListener;
 
     SDL_TouchFingerEvent m_LastTouchDownEvent;
     SDL_TouchFingerEvent m_LastTouchUpEvent;
