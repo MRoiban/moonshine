@@ -1497,6 +1497,24 @@ Flickable {
                     }
                 }
 
+                CheckBox {
+                    id: macUseFKeysForStreamingCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    visible: Qt.platform.os === "osx"
+                    text: qsTr("Use Mac function row as Windows function keys while streaming")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.macUseFKeysForStreaming
+                    onCheckedChanged: {
+                        StreamingPreferences.macUseFKeysForStreaming = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("When the stream window is focused, Moonlight temporarily changes macOS to send F1-F12 instead of brightness, volume, and media keys. The original macOS behavior is restored when the stream loses focus or ends.")
+                }
+
                 Label {
                     width: parent.width
                     text: qsTr("Disconnect session keyboard shortcut")

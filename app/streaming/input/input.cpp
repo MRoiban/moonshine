@@ -25,6 +25,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_MacAltMapping(prefs.macAltMapping),
       m_MacShiftMapping(prefs.macShiftMapping),
       m_MacMetaMapping(prefs.macMetaMapping),
+      m_MacUseFKeysForStreaming(prefs.macUseFKeysForStreaming),
       m_DisableCtrlEscStartMenu(prefs.disableCtrlEscStartMenu),
       m_MouseCursorCapturedVisibilityState(SDL_DISABLE),
       m_LongPressTimer(0),
@@ -223,6 +224,10 @@ SdlInputHandler::~SdlInputHandler()
     // Return background event handling to off
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "0");
 
+#ifdef Q_OS_DARWIN
+    m_MacFnKeyModeGuard.setActive(false);
+#endif
+
     // Restore the ignored devices
     SDL_SetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES, m_OldIgnoreDevices.toUtf8());
     SDL_SetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT, m_OldIgnoreDevicesExcept.toUtf8());
@@ -239,6 +244,9 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+#ifdef Q_OS_DARWIN
+    updateMacFnKeyMode();
+#endif
 }
 
 void SdlInputHandler::raiseAllKeys()
@@ -280,6 +288,10 @@ void SdlInputHandler::notifyMouseLeave()
 
 void SdlInputHandler::notifyFocusLost()
 {
+#ifdef Q_OS_DARWIN
+    m_MacFnKeyModeGuard.setActive(false);
+#endif
+
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.
     // Doing this while the window is full-screen breaks the transition out of FS
@@ -295,6 +307,9 @@ void SdlInputHandler::notifyFocusLost()
 
 void SdlInputHandler::notifyFocusGained()
 {
+#ifdef Q_OS_DARWIN
+    updateMacFnKeyMode();
+#endif
 }
 
 bool SdlInputHandler::isCaptureActive()
@@ -329,7 +344,23 @@ void SdlInputHandler::updateKeyboardGrabState()
 #endif
 
     m_KeyboardCaptureActive = shouldGrab;
+
+#ifdef Q_OS_DARWIN
+    updateMacFnKeyMode();
+#endif
 }
+
+#ifdef Q_OS_DARWIN
+void SdlInputHandler::updateMacFnKeyMode()
+{
+    bool shouldUseFKeys = false;
+    if (m_MacUseFKeysForStreaming && m_Window != nullptr) {
+        shouldUseFKeys = (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS) != 0;
+    }
+
+    m_MacFnKeyModeGuard.setActive(shouldUseFKeys);
+}
+#endif
 
 bool SdlInputHandler::isSystemKeyCaptureActive()
 {

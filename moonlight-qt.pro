@@ -15,6 +15,10 @@ win32:!winrt {
 # Support debug and release builds from command line for CI
 CONFIG += debug_and_release
 
+macx:!no-release-dmg {
+    release.commands += $$PWD/scripts/generate-dmg.sh Release
+}
+
 # Run our compile tests
 load(configure)
 qtCompileTest(SL)

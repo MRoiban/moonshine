@@ -171,6 +171,7 @@ public:
     Q_PROPERTY(MacModifierKey macAltMapping MEMBER macAltMapping NOTIFY macModifierMappingChanged)
     Q_PROPERTY(MacModifierKey macShiftMapping MEMBER macShiftMapping NOTIFY macModifierMappingChanged)
     Q_PROPERTY(MacModifierKey macMetaMapping MEMBER macMetaMapping NOTIFY macModifierMappingChanged)
+    Q_PROPERTY(bool macUseFKeysForStreaming MEMBER macUseFKeysForStreaming NOTIFY macUseFKeysForStreamingChanged)
     Q_PROPERTY(bool disableCtrlEscStartMenu MEMBER disableCtrlEscStartMenu NOTIFY ctrlEscBehaviorChanged)
     Q_PROPERTY(QString activeStreamQuitShortcutKey MEMBER activeStreamQuitShortcutKey NOTIFY activeStreamQuitShortcutChanged)
     Q_PROPERTY(int activeStreamQuitShortcutModifiers MEMBER activeStreamQuitShortcutModifiers NOTIFY activeStreamQuitShortcutChanged)
@@ -224,6 +225,7 @@ public:
     MacModifierKey macAltMapping;
     MacModifierKey macShiftMapping;
     MacModifierKey macMetaMapping;
+    bool macUseFKeysForStreaming;
     bool disableCtrlEscStartMenu;
     QString activeStreamQuitShortcutKey;
     int activeStreamQuitShortcutModifiers;
@@ -267,6 +269,7 @@ signals:
     void audioDropThresholdMsChanged();
     void languageChanged();
     void macModifierMappingChanged();
+    void macUseFKeysForStreamingChanged();
     void ctrlEscBehaviorChanged();
     void activeStreamQuitShortcutChanged();
 

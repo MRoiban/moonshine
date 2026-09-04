@@ -15,6 +15,7 @@ BUILD_ROOT=$PWD/build
 SOURCE_ROOT=$PWD
 BUILD_FOLDER=$BUILD_ROOT/build-$BUILD_CONFIG
 INSTALLER_FOLDER=$BUILD_ROOT/installer-$BUILD_CONFIG
+APPLE_DEVICE_ARCHS=${QMAKE_APPLE_DEVICE_ARCHS:-$(uname -m)}
 
 if [ -n "$CI_VERSION" ]; then
   VERSION=$CI_VERSION
@@ -47,11 +48,18 @@ export CXXFLAGS=-flto=thin
 export LDFLAGS=-flto=thin
 
 echo Configuring the project
+echo "Building for macOS architecture(s): $APPLE_DEVICE_ARCHS"
 pushd $BUILD_FOLDER
-qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64" || fail "Qmake failed!"
+qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="$APPLE_DEVICE_ARCHS" CONFIG+=no-release-dmg || fail "Qmake failed!"
 popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration
+mkdir -p $BUILD_FOLDER/app
+pushd $BUILD_FOLDER/app
+qmake $SOURCE_ROOT/app/app.pro QMAKE_APPLE_DEVICE_ARCHS="$APPLE_DEVICE_ARCHS" || fail "App qmake failed!"
+make -f Makefile.Release mocables || fail "MOC generation failed!"
+popd
+
 pushd $BUILD_FOLDER
 make -j$(sysctl -n hw.logicalcpu) $(echo "$BUILD_CONFIG" | tr '[:upper:]' '[:lower:]') || fail "Make failed!"
 popd
@@ -77,10 +85,12 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
 fi
 
 echo Creating DMG
+DMG_OUTPUT=$INSTALLER_FOLDER/Moonlight.dmg
+rm -f "$DMG_OUTPUT"
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --identity="$SIGNING_IDENTITY" --no-version-in-filename || fail "create-dmg failed!"
+  create-dmg --volname Moonlight --app-drop-link 425 120 --codesign "$SIGNING_IDENTITY" "$DMG_OUTPUT" $BUILD_FOLDER/app || fail "create-dmg failed!"
 else
-  create-dmg $BUILD_FOLDER/app/Moonlight.app $INSTALLER_FOLDER --no-version-in-filename
+  create-dmg --volname Moonlight --app-drop-link 425 120 "$DMG_OUTPUT" $BUILD_FOLDER/app
   case $? in
     0) ;;
     2) ;;

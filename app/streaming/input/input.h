@@ -3,6 +3,7 @@
 #include "settings/streamingpreferences.h"
 #include "backend/computermanager.h"
 #include "streaming/input/keyboardlistener.h"
+#include "streaming/input/macfnkeys.h"
 
 #include "SDL_compat.h"
 
@@ -174,6 +175,10 @@ private:
 
     void performKeyboardShortcut(SdlKeyboardListener::Shortcut shortcut);
 
+#ifdef Q_OS_DARWIN
+    void updateMacFnKeyMode();
+#endif
+
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
 
@@ -214,6 +219,10 @@ private:
     StreamingPreferences::MacModifierKey m_MacAltMapping;
     StreamingPreferences::MacModifierKey m_MacShiftMapping;
     StreamingPreferences::MacModifierKey m_MacMetaMapping;
+    bool m_MacUseFKeysForStreaming;
+#ifdef Q_OS_DARWIN
+    MacFnKeyModeGuard m_MacFnKeyModeGuard;
+#endif
     bool m_DisableCtrlEscStartMenu;
     int m_MouseCursorCapturedVisibilityState;
     SdlKeyboardListener m_KeyboardListener;

@@ -161,8 +161,9 @@ macx {
         CONFIG += discord-rpc
     }
 
-    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework Metal -framework QuartzCore
+    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework IOKit -framework Metal -framework QuartzCore
     CONFIG += ffmpeg
+    OBJECTIVE_SOURCES += streaming/input/macfnkeys.mm
 }
 
 SOURCES += \
@@ -229,6 +230,7 @@ HEADERS += \
     cli/startstream.h \
     settings/streamingpreferences.h \
     streaming/input/input.h \
+    streaming/input/macfnkeys.h \
     streaming/input/keyboardlistener.h \
     streaming/session.h \
     streaming/audio/renderers/renderer.h \

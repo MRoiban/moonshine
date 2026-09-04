@@ -60,6 +60,7 @@
 #define SER_MACMOD_ALT "macmodalt"
 #define SER_MACMOD_SHIFT "macmodshift"
 #define SER_MACMOD_META "macmodmeta"
+#define SER_MACUSEFKEYSFORSTREAMING "macusefkeysforstreaming"
 #define SER_DISABLECTRLESC "disablectrlesc"
 #define SER_ACTIVEQUITSHORTCUTKEY "activequitshortcutkey"
 #define SER_ACTIVEQUITSHORTCUTMODIFIERS "activequitshortcutmodifiers"
@@ -231,6 +232,7 @@ void StreamingPreferences::reload()
                                                       static_cast<int>(MacModifierKey::MMK_SHIFT)).toInt());
     macMetaMapping = static_cast<MacModifierKey>(settings.value(SER_MACMOD_META,
                                                      static_cast<int>(MacModifierKey::MMK_COMMAND)).toInt());
+    macUseFKeysForStreaming = settings.value(SER_MACUSEFKEYSFORSTREAMING, false).toBool();
     disableCtrlEscStartMenu = settings.value(SER_DISABLECTRLESC, false).toBool();
     activeStreamQuitShortcutKey = sanitizeShortcutKey(settings.value(SER_ACTIVEQUITSHORTCUTKEY,
                                                                      kDefaultActiveStreamQuitShortcutKey).toString());
@@ -462,6 +464,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_MACMOD_ALT, static_cast<int>(macAltMapping));
     settings.setValue(SER_MACMOD_SHIFT, static_cast<int>(macShiftMapping));
     settings.setValue(SER_MACMOD_META, static_cast<int>(macMetaMapping));
+    settings.setValue(SER_MACUSEFKEYSFORSTREAMING, macUseFKeysForStreaming);
     settings.setValue(SER_DISABLECTRLESC, disableCtrlEscStartMenu);
     settings.setValue(SER_ACTIVEQUITSHORTCUTKEY, sanitizeShortcutKey(activeStreamQuitShortcutKey));
     settings.setValue(SER_ACTIVEQUITSHORTCUTMODIFIERS, sanitizeShortcutModifiers(activeStreamQuitShortcutModifiers));

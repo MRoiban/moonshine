@@ -121,13 +121,20 @@ void SdlInputHandler::performKeyboardShortcut(SdlKeyboardListener::Shortcut shor
 
     case SdlKeyboardListener::ShortcutToggleMouseMode:
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected mouse mode toggle combo");
+                    "Detected seamless mouse mode toggle combo");
 
         // Uncapture input
         setCaptureActive(false);
 
-        // Toggle mouse mode
+        // Toggle between captured relative input for games and seamless absolute
+        // input for desktop use. Full-screen normally enables a separate pointer
+        // region lock, so explicitly disable it in absolute mode to allow the
+        // cursor to move onto another local display. Relative mouse mode captures
+        // the cursor itself, but keeping the region lock enabled preserves the
+        // expected captured state if relative mode is unavailable on the platform.
         m_AbsoluteMouseMode = !m_AbsoluteMouseMode;
+        m_PointerRegionLockActive = !m_AbsoluteMouseMode;
+        m_PointerRegionLockToggledByUser = true;
 
         // Recapture input
         setCaptureActive(true);
