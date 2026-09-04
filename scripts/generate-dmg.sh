@@ -86,11 +86,14 @@ fi
 
 echo Creating DMG
 DMG_OUTPUT=$INSTALLER_FOLDER/Moonlight.dmg
+DMG_SOURCE_FOLDER=$INSTALLER_FOLDER/dmg-source
 rm -f "$DMG_OUTPUT"
+mkdir -p "$DMG_SOURCE_FOLDER"
+ditto "$BUILD_FOLDER/app/Moonlight.app" "$DMG_SOURCE_FOLDER/Moonlight.app" || fail "Failed to stage app bundle for DMG!"
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  create-dmg --volname Moonlight --app-drop-link 425 120 --codesign "$SIGNING_IDENTITY" "$DMG_OUTPUT" $BUILD_FOLDER/app || fail "create-dmg failed!"
+  create-dmg --volname Moonlight --app-drop-link 425 120 --codesign "$SIGNING_IDENTITY" "$DMG_OUTPUT" "$DMG_SOURCE_FOLDER" || fail "create-dmg failed!"
 else
-  create-dmg --volname Moonlight --app-drop-link 425 120 "$DMG_OUTPUT" $BUILD_FOLDER/app
+  create-dmg --volname Moonlight --app-drop-link 425 120 "$DMG_OUTPUT" "$DMG_SOURCE_FOLDER"
   case $? in
     0) ;;
     2) ;;
