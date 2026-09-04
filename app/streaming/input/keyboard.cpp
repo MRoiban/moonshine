@@ -246,12 +246,28 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 {
     short keyCode;
     char modifiers;
+    char shortcutModifiers = 0;
     bool shouldNotConvertToScanCodeOnServer = false;
 
     if (event->repeat) {
         // Ignore repeat key down events
         SDL_assert(event->state == SDL_PRESSED);
         return;
+    }
+
+    // Moonlight shortcuts describe physical client keys, so they must not change
+    // when the user remaps Mac modifiers for the remote host.
+    if (event->keysym.mod & KMOD_CTRL) {
+        shortcutModifiers |= MODIFIER_CTRL;
+    }
+    if (event->keysym.mod & KMOD_ALT) {
+        shortcutModifiers |= MODIFIER_ALT;
+    }
+    if (event->keysym.mod & KMOD_SHIFT) {
+        shortcutModifiers |= MODIFIER_SHIFT;
+    }
+    if (event->keysym.mod & KMOD_GUI) {
+        shortcutModifiers |= MODIFIER_META;
     }
 
 #ifdef Q_OS_DARWIN
@@ -322,7 +338,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     }
 #endif
 
-    SdlKeyboardListener::Shortcut shortcut = m_KeyboardListener.matchKeyPress(event, modifiers);
+    SdlKeyboardListener::Shortcut shortcut = m_KeyboardListener.matchKeyPress(event, shortcutModifiers);
     if (shortcut != SdlKeyboardListener::ShortcutNone) {
         performKeyboardShortcut(shortcut);
         return;
