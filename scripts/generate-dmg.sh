@@ -80,8 +80,13 @@ echo Removing dSYM files from app bundle
 find $BUILD_FOLDER/app/Moonlight.app/ -name '*.dSYM' | xargs rm -rf
 
 if [ "$SIGNING_IDENTITY" != "" ]; then
+  [ -n "$MOONLIGHT_PROVISION_PROFILE" ] || fail "Set MOONLIGHT_PROVISION_PROFILE to a profile granting the spatial audio entitlements."
+  cp "$MOONLIGHT_PROVISION_PROFILE" "$BUILD_FOLDER/app/Moonlight.app/Contents/embedded.provisionprofile" || fail "Provisioning profile copy failed!"
+
   echo Signing app bundle
-  codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" $BUILD_FOLDER/app/Moonlight.app || fail "Signing failed!"
+  codesign --force --deep --options runtime --timestamp \
+    --entitlements "$SOURCE_ROOT/app/deploy/macos/spatial-audio.entitlements" \
+    --sign "$SIGNING_IDENTITY" "$BUILD_FOLDER/app/Moonlight.app" || fail "Signing failed!"
 fi
 
 echo Creating DMG

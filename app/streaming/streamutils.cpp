@@ -198,9 +198,18 @@ int StreamUtils::getDisplayRefreshRate(SDL_Window* window)
                     "Refresh rate unknown; assuming 60 Hz");
         mode.refresh_rate = 60;
     }
-
     return mode.refresh_rate;
 }
+
+#ifndef Q_OS_DARWIN
+RefreshRateRational StreamUtils::getDisplayRefreshRateRational(SDL_Window* window)
+{
+    int refresh_rate = getDisplayRefreshRate(window);
+
+    RefreshRateRational result {refresh_rate, 1, (double)refresh_rate, true};
+    return result;
+}
+#endif
 
 bool StreamUtils::hasFastAes()
 {

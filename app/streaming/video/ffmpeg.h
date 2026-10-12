@@ -7,7 +7,7 @@
 #include "../bandwidth.h"
 #include "decoder.h"
 #include "ffmpeg-renderers/renderer.h"
-#include "ffmpeg-renderers/pacer/pacer.h"
+#include "ffmpeg-renderers/framepacing/framepacer.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -49,12 +49,6 @@ private:
                                 PDECODER_PARAMETERS params,
                                 TestMode testMode,
                                 bool useAlternateFrontend);
-
-    void stringifyVideoStats(VIDEO_STATS& stats, char* output, int length);
-
-    void logVideoStats(VIDEO_STATS& stats, const char* title);
-
-    void addVideoStats(VIDEO_STATS& src, VIDEO_STATS& dst);
 
     bool createFrontendRenderer(PDECODER_PARAMETERS params, bool useAlternateFrontend);
 
@@ -112,11 +106,7 @@ private:
     IFFmpegRenderer* m_BackendRenderer;
     IFFmpegRenderer* m_FrontendRenderer;
     int m_ConsecutiveFailedDecodes;
-    Pacer* m_Pacer;
     BandwidthTracker m_BwTracker;
-    VIDEO_STATS m_ActiveWndVideoStats;
-    VIDEO_STATS m_LastWndVideoStats;
-    VIDEO_STATS m_GlobalVideoStats;
     std::set<IFFmpegRenderer::RendererType> m_FailedRenderers;
 
     int m_FramesIn;

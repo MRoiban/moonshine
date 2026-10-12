@@ -524,6 +524,12 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 else {
                     return;
                 }
+
+                // Extended flags describe the remote key after mapping, not
+                // the physical Mac key used to generate it.
+                if (keyCode == 0x5B || keyCode == 0x5C || keyCode == 0xA3 || keyCode == 0xA5) {
+                    modifiers |= MODIFIER_EXTENDED;
+                }
                 break;
             }
 #else

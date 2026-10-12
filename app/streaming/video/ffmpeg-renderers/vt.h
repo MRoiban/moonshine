@@ -17,8 +17,12 @@ protected:
     bool m_HdrMetadataChanged; // Manual reset
     CFDataRef m_MasteringDisplayColorVolume;
     CFDataRef m_ContentLightLevelInfo;
+    float m_MinNits;
+    float m_MaxNits;
+    bool m_OverrideNits;
 };
-#endif
+
+#endif // __OBJC__
 
 // A factory is required to avoid pulling in
 // incompatible Objective-C headers.

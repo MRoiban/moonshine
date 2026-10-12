@@ -161,7 +161,22 @@ macx {
         CONFIG += discord-rpc libplacebo
     }
 
-    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework IOKit -framework Metal -framework QuartzCore
+    LIBS += -lobjc \
+        -framework Accelerate \
+        -framework AppKit \
+        -framework IOKit \
+        -framework AudioToolbox \
+        -framework AudioUnit \
+        -framework AVFoundation \
+        -framework CoreAudio \
+        -framework CoreGraphics \
+        -framework CoreMedia \
+        -framework CoreVideo \
+        -framework GameController \
+        -framework Metal \
+        -framework MetalKit \
+        -framework QuartzCore \
+        -framework VideoToolbox
     CONFIG += ffmpeg
     OBJECTIVE_SOURCES += streaming/input/macfnkeys.mm
 }
@@ -199,6 +214,7 @@ SOURCES += \
     gui/computermodel.cpp \
     gui/appmodel.cpp \
     streaming/bandwidth.cpp \
+    streaming/floatbuffer.cpp \
     streaming/streamutils.cpp \
     backend/autoupdatechecker.cpp \
     path.cpp \
@@ -239,16 +255,20 @@ HEADERS += \
     gui/appmodel.h \
     streaming/video/decoder.h \
     streaming/bandwidth.h \
+    streaming/floatbuffer.h \
     streaming/streamutils.h \
     backend/autoupdatechecker.h \
     path.h \
     settings/mappingmanager.h \
     gui/sdlgamepadkeynavigation.h \
     streaming/video/overlaymanager.h \
-    backend/systemproperties.h
+    backend/systemproperties.h \
+    streaming/qpc.h
 
 # Platform-specific renderers and decoders
 ffmpeg {
+    SOURCES += imgui/devui.cpp imgui/imgui_plots.cpp streaming/stats.cpp
+    HEADERS += imgui/devui.h imgui/plotdesc.h imgui/imgui_plots.h streaming/stats.h
     message(FFmpeg decoder selected)
 
     DEFINES += HAVE_FFMPEG
@@ -257,7 +277,9 @@ ffmpeg {
         streaming/video/ffmpeg-renderers/genhwaccel.cpp \
         streaming/video/ffmpeg-renderers/sdlvid.cpp \
         streaming/video/ffmpeg-renderers/swframemapper.cpp \
-        streaming/video/ffmpeg-renderers/pacer/pacer.cpp
+        streaming/video/ffmpeg-renderers/framepacing/framecadence.cpp \
+        streaming/video/ffmpeg-renderers/framepacing/framepacer.cpp \
+        streaming/video/ffmpeg-renderers/framepacing/framequeue.cpp
 
     HEADERS += \
         streaming/video/ffmpeg.h \
@@ -265,7 +287,9 @@ ffmpeg {
         streaming/video/ffmpeg-renderers/genhwaccel.h \
         streaming/video/ffmpeg-renderers/sdlvid.h \
         streaming/video/ffmpeg-renderers/swframemapper.h \
-        streaming/video/ffmpeg-renderers/pacer/pacer.h
+        streaming/video/ffmpeg-renderers/framepacing/framecadence.h \
+        streaming/video/ffmpeg-renderers/framepacing/framepacer.h \
+        streaming/video/ffmpeg-renderers/framepacing/framequeue.h
 }
 libva {
     message(VAAPI renderer selected)
@@ -409,14 +433,31 @@ win32:!winrt {
         streaming/video/ffmpeg-renderers/pacer/dxvsyncsource.h
 }
 macx {
-    message(VideoToolbox renderer selected)
+    message(CoreAudio + VideoToolbox renderers selected)
+
+    DEFINES += HAVE_COREAUDIO
+
+    # ImGui can be disabled completely with this define
+    # DEFINES += IMGUI_DISABLE
+
+    # QMAKE_OBJECTIVE_CFLAGS = -fobjc-arc
 
     SOURCES += \
+        streaming/audio/renderers/coreaudio/au_spatial_renderer.mm \
+        streaming/audio/renderers/coreaudio/coreaudio.cpp \
+        streaming/audio/renderers/coreaudio/TPCircularBuffer.c \
+        streaming/streamutils_mac.mm \
+        streaming/video/ffmpeg-renderers/pacer/displaylink_source.mm \
         streaming/video/ffmpeg-renderers/vt_base.mm \
         streaming/video/ffmpeg-renderers/vt_avsamplelayer.mm \
         streaming/video/ffmpeg-renderers/vt_metal.mm
 
     HEADERS += \
+        streaming/audio/renderers/coreaudio/au_spatial_renderer.h \
+        streaming/audio/renderers/coreaudio/coreaudio.h \
+        streaming/audio/renderers/coreaudio/coreaudio_helpers.h \
+        streaming/audio/renderers/coreaudio/TPCircularBuffer.h \
+        streaming/video/ffmpeg-renderers/pacer/displaylink_source.h \
         streaming/video/ffmpeg-renderers/vt.h
 }
 discord-rpc {
@@ -516,6 +557,13 @@ else:unix: LIBS += -L$$OUT_PWD/../h264bitstream/ -lh264bitstream
 INCLUDEPATH += $$PWD/../h264bitstream
 DEPENDPATH += $$PWD/../h264bitstream
 
+win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../imgui/release/ -limgui
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../imgui/debug/ -limgui
+else:unix: LIBS += -L$$OUT_PWD/../imgui/ -limgui
+
+INCLUDEPATH += $$PWD/../imgui/imgui $$PWD/../imgui/imgui/backends $$PWD/../imgui/implot
+DEPENDPATH += $$PWD/../imgui/imgui
+
 !winrt {
     win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../AntiHooking/release/ -lAntiHooking
     else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../AntiHooking/debug/ -lAntiHooking
@@ -559,18 +607,15 @@ win32 {
 }
 macx {
     # Create Info.plist in object dir with the correct version string
-    system(cp $$PWD/Info.plist $$OUT_PWD/Info.plist)
-    system(sed -i -e 's/VERSION/$$cat(version.txt)/g' $$OUT_PWD/Info.plist)
+    system(cp $$PWD/Info.plist $$OUT_PWD/moonlight-Info.plist)
+    system(sed -i -e 's/VERSION/$$cat(version.txt)/g' $$OUT_PWD/moonlight-Info.plist)
 
-    QMAKE_INFO_PLIST = $$OUT_PWD/Info.plist
+    QMAKE_INFO_PLIST = $$OUT_PWD/moonlight-Info.plist
 
-    APP_BUNDLE_RESOURCES.files = moonlight.icns
+    APP_BUNDLE_RESOURCES.files = moonlight.icns deploy/macos/spatial-audio.entitlements
     APP_BUNDLE_RESOURCES.path = Contents/Resources
 
-    APP_BUNDLE_PLIST.files = $$OUT_PWD/Info.plist
-    APP_BUNDLE_PLIST.path = Contents
-
-    QMAKE_BUNDLE_DATA += APP_BUNDLE_RESOURCES APP_BUNDLE_PLIST
+    QMAKE_BUNDLE_DATA += APP_BUNDLE_RESOURCES
 
     !disable-prebuilts {
         APP_BUNDLE_FRAMEWORKS.files = $$files(../libs/mac/Frameworks/*.framework, true) $$files(../libs/mac/lib/*.dylib, true)

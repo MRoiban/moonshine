@@ -3,8 +3,15 @@
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
 
+#ifdef HAVE_FFMPEG
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui/devui.h"
+#endif
+
 #include <Limelight.h>
 #include "SDL_compat.h"
+#include "path.h"
 #include "utils.h"
 
 #ifdef HAVE_FFMPEG
@@ -21,13 +28,6 @@
 #else
 #define ICON_SIZE 64
 #endif
-
-#define SDL_CODE_FLUSH_WINDOW_EVENT_BARRIER 100
-#define SDL_CODE_GAMECONTROLLER_RUMBLE 101
-#define SDL_CODE_GAMECONTROLLER_RUMBLE_TRIGGERS 102
-#define SDL_CODE_GAMECONTROLLER_SET_MOTION_EVENT_STATE 103
-#define SDL_CODE_GAMECONTROLLER_SET_CONTROLLER_LED 104
-#define SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS 105
 
 #include <openssl/rand.h>
 
@@ -600,6 +600,11 @@ bool Session::initialize(QQuickWindow* qtWindow)
 {
     m_QtWindow = qtWindow;
 
+    // Pass initial settings to DevUI panel
+#ifdef HAVE_FFMPEG
+    DevUISettings::instance().InitFromPrefs(*m_Preferences);
+#endif
+
 #ifdef Q_OS_DARWIN
     if (qEnvironmentVariableIntValue("I_WANT_BUGGY_FULLSCREEN") == 0) {
         // If we have a notch and the user specified one of the two native display modes
@@ -680,6 +685,33 @@ bool Session::initialize(QQuickWindow* qtWindow)
 
     m_StreamConfig.fps = m_Preferences->fps;
     m_StreamConfig.bitrate = m_Preferences->bitrateKbps;
+
+    // get the precise refresh rate
+    m_StreamConfig.clientRefreshRateX100 = 0;
+    RefreshRateRational refreshRate = StreamUtils::getDisplayRefreshRateRational(testWindow);
+    if (refreshRate.valid) {
+        // choosing the lesser value should cover both common use cases: 60fps on 120hz, and 60fps on 59.94hz
+        int x100 = lround(refreshRate.hz * 100);
+        m_StreamConfig.clientRefreshRateX100 = SDL_min(m_StreamConfig.fps * 100, x100);
+        if (x100 % 2997 == 0) {
+            // Handle multiples of NTSC 29.97 e.g. 59.94, 119.88 paired with multiples of 30fps
+            if (m_StreamConfig.fps % 30 == 0) {
+                m_StreamConfig.clientRefreshRateX100 = 2997 * (m_StreamConfig.fps / 30);
+            }
+        }
+
+        // XXX request a slightly lower framerate (0.1%)
+        // m_StreamConfig.clientRefreshRateX100 -= lround(refreshRate.hz / 10.0);
+
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Set clientRefreshRateX100=%d for precise refresh rate %.2fHz (%d/%d)",
+                    m_StreamConfig.clientRefreshRateX100, refreshRate.hz,
+                    refreshRate.numerator, refreshRate.denominator);
+    }
+    else {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Failed to set clientRefreshRateX100, could not determine precise refresh rate");
+    }
 
 #ifndef STEAM_LINK
     // Opt-in to all encryption features if we detect that the platform
@@ -1502,10 +1534,8 @@ void Session::updateOptimalWindowDisplayMode()
     SDL_SetWindowDisplayMode(m_Window, &bestMode);
 }
 
-void Session::toggleFullscreen()
+void Session::setWindowMode(uint32_t windowMode)
 {
-    bool fullScreen = !(SDL_GetWindowFlags(m_Window) & m_FullScreenFlag);
-
 #if defined(Q_OS_WIN32) || defined(Q_OS_DARWIN)
     // Destroy the video decoder before toggling full-screen because D3D9 can try
     // to put the window back into full-screen before we've managed to destroy
@@ -1521,14 +1551,29 @@ void Session::toggleFullscreen()
     SDL_UnlockMutex(m_DecoderLock);
 #endif
 
+    uint32_t sdlWindowMode = 0;
+    switch (windowMode) {
+        case StreamingPreferences::WM_FULLSCREEN:
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Switching to SDL window mode SDL_WINDOW_FULLSCREEN");
+            sdlWindowMode = SDL_WINDOW_FULLSCREEN;
+            break;
+        case StreamingPreferences::WM_FULLSCREEN_DESKTOP:
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Switching to SDL window mode SDL_WINDOW_FULLSCREEN_DESKTOP");
+            sdlWindowMode = SDL_WINDOW_FULLSCREEN_DESKTOP;
+            break;
+        case StreamingPreferences::WM_WINDOWED:
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Switching to SDL windowed mode");
+            break;
+    }
+
     // Actually enter/leave fullscreen
-    SDL_SetWindowFullscreen(m_Window, fullScreen ? m_FullScreenFlag : 0);
+    SDL_SetWindowFullscreen(m_Window, sdlWindowMode);
 
 #ifdef Q_OS_DARWIN
     // SDL on macOS has a bug that causes the window size to be reset to crazy
     // large dimensions when exiting out of true fullscreen mode. We can work
     // around the issue by manually resetting the position and size here.
-    if (!fullScreen && m_FullScreenFlag == SDL_WINDOW_FULLSCREEN) {
+    if (windowMode == StreamingPreferences::WM_WINDOWED && m_FullScreenFlag == SDL_WINDOW_FULLSCREEN) {
         int x, y, width, height;
         getWindowDimensions(x, y, width, height);
         SDL_SetWindowSize(m_Window, width, height);
@@ -1541,6 +1586,21 @@ void Session::toggleFullscreen()
 
     // Input handler might need stop/stop mouse grab after changing modes
     m_InputHandler->updatePointerRegionLock();
+}
+
+void Session::toggleFullscreen()
+{
+    // Swap between windowed mode and the recommended fullscreen mode
+    bool fullScreen = !(SDL_GetWindowFlags(m_Window) & m_FullScreenFlag);
+
+    uint32_t targetWindowMode = StreamingPreferences::WM_WINDOWED;
+    if (fullScreen) {
+        targetWindowMode = m_FullScreenFlag == SDL_WINDOW_FULLSCREEN
+            ? StreamingPreferences::WM_FULLSCREEN
+            : StreamingPreferences::WM_FULLSCREEN_DESKTOP;
+    }
+
+    setWindowMode(targetWindowMode);
 }
 
 void Session::notifyMouseEmulationMode(bool enabled)
@@ -1995,6 +2055,18 @@ void Session::exec()
             continue;
         }
 #endif
+
+#if defined(HAVE_FFMPEG) && !defined(IMGUI_DISABLE)
+        // let ImGui read keyboard/mouse events. If interacting with a UI element, we will check
+        // io.WantCaptureMouse and io.WantCaptureKeyboard below
+        if (ImGui::GetCurrentContext()) {
+            ImGuiIO& io = ImGui::GetIO();
+            if (io.BackendPlatformUserData != nullptr) {
+                ImGui_ImplSDL2_ProcessEvent(&event);
+            }
+        }
+#endif
+
         switch (event.type) {
         case SDL_QUIT:
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
@@ -2035,6 +2107,9 @@ void Session::exec()
             case SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS:
                 m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.user.data1,
                                                     (DualSenseOutputReport *)event.user.data2);
+                break;
+            case SDL_CODE_SET_WINDOW_MODE:
+                setWindowMode((uint32_t)(uintptr_t)event.user.data1);
                 break;
             default:
                 SDL_assert(false);

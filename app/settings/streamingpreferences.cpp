@@ -22,9 +22,11 @@
 #define SER_FULLSCREEN "fullscreen"
 #define SER_VSYNC "vsync"
 #define SER_GAMEOPTS "gameopts"
+#define SER_HEADTRACKING "headtracking"
 #define SER_HOSTAUDIO "hostaudio"
 #define SER_MULTICONT "multicontroller"
 #define SER_AUDIOCFG "audiocfg"
+#define SER_SPATIALAUDIOCFG "spatialaudiocfg"
 #define SER_VIDEOCFG "videocfg"
 #define SER_HDR "hdr"
 #define SER_YUV444 "yuv444"
@@ -65,6 +67,11 @@
 #define SER_ACTIVEQUITSHORTCUTKEY "activequitshortcutkey"
 #define SER_ACTIVEQUITSHORTCUTMODIFIERS "activequitshortcutmodifiers"
 #define SER_RENDERER "renderer"
+#define SER_AUDIO_RENDERER "audioRenderer"
+#define SER_FRAMEPACINGMODE "framePacingMode"
+#define SER_FRAMEPRESENTMODE "presentMode"
+#define SER_SHOWPERFORMANCEGRAPHS "showPerformanceGraphs"
+#define SER_VTMETALFRAMESINFLIGHT "vtMetalFramesInFlight"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -241,6 +248,32 @@ void StreamingPreferences::reload()
                                                                      kDefaultActiveStreamQuitShortcutKey).toString());
     activeStreamQuitShortcutModifiers = sanitizeShortcutModifiers(settings.value(SER_ACTIVEQUITSHORTCUTMODIFIERS,
                                                                                 kDefaultActiveStreamQuitShortcutModifiers).toInt());
+
+    audioRenderer = AudioRenderer::AUDIO_RENDERER_SDL;
+    spatialAudioConfig = SpatialAudioConfig::SAC_DISABLED;
+    vtMetalFramesInFlight = 3;
+#ifdef Q_OS_DARWIN
+    vtMetalFramesInFlight = settings.value(SER_VTMETALFRAMESINFLIGHT, 3).toInt();
+    audioRenderer = static_cast<AudioRenderer>(settings.value(SER_AUDIO_RENDERER,
+                                                    static_cast<int>(AudioRenderer::AUDIO_RENDERER_COREAUDIO)).toInt());
+    spatialAudioConfig = static_cast<SpatialAudioConfig>(settings.value(SER_SPATIALAUDIOCFG,
+                                                    static_cast<int>(SpatialAudioConfig::SAC_DISABLED)).toInt());
+#endif
+    framePacingMode = static_cast<FramePacingMode>(settings.value(SER_FRAMEPACINGMODE,
+                                                   static_cast<int>(framePacing ? FramePacingMode::FRAME_PACING_DISPLAY_LOCKED : FramePacingMode::FRAME_PACING_IMMEDIATE)).toInt());
+    presentMode = static_cast<PresentMode>(settings.value(SER_FRAMEPRESENTMODE,
+                                                    static_cast<int>(enableVsync ? PresentMode::PRESENT_AUTO : PresentMode::PRESENT_NO_VSYNC)).toInt());
+    showPerformanceGraphs = settings.value(SER_SHOWPERFORMANCEGRAPHS, false).toBool();
+
+    framePacing = framePacingMode == FramePacingMode::FRAME_PACING_DISPLAY_LOCKED;
+
+    // old enableVsync is now based on presentMode
+    if (presentMode == PresentMode::PRESENT_NO_VSYNC) {
+        enableVsync = false;
+    }
+    else {
+        enableVsync = true;
+    }
 
 
     // Perform default settings updates as required based on last default version
@@ -445,6 +478,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_DETECTNETBLOCKING, detectNetworkBlocking);
     settings.setValue(SER_SHOWPERFOVERLAY, showPerformanceOverlay);
     settings.setValue(SER_AUDIOCFG, static_cast<int>(audioConfig));
+    settings.setValue(SER_SPATIALAUDIOCFG, static_cast<int>(spatialAudioConfig));
     settings.setValue(SER_HDR, enableHdr);
     settings.setValue(SER_YUV444, enableYUV444);
     settings.setValue(SER_VIDEOCFG, static_cast<int>(videoCodecConfig));
@@ -472,6 +506,11 @@ void StreamingPreferences::save()
     settings.setValue(SER_DISABLECTRLESC, disableCtrlEscStartMenu);
     settings.setValue(SER_ACTIVEQUITSHORTCUTKEY, sanitizeShortcutKey(activeStreamQuitShortcutKey));
     settings.setValue(SER_ACTIVEQUITSHORTCUTMODIFIERS, sanitizeShortcutModifiers(activeStreamQuitShortcutModifiers));
+    settings.setValue(SER_AUDIO_RENDERER, static_cast<int>(audioRenderer));
+    settings.setValue(SER_FRAMEPACINGMODE, static_cast<int>(framePacingMode));
+    settings.setValue(SER_FRAMEPRESENTMODE, static_cast<int>(presentMode));
+    settings.setValue(SER_SHOWPERFORMANCEGRAPHS, showPerformanceGraphs);
+    settings.setValue(SER_VTMETALFRAMESINFLIGHT, vtMetalFramesInFlight);
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

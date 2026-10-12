@@ -193,6 +193,10 @@ public:
         // Don't wait by default
     }
 
+    virtual void presentFrame(AVFrame*, uint64_t) {
+        // Nothing
+    }
+
     // Called on the same thread as renderFrame() during destruction of the renderer
     virtual void cleanupRenderContext() {
         // Nothing
@@ -259,6 +263,16 @@ public:
         }
     }
 
+    virtual bool isVsyncEnabled() {
+        // Is vsync enabled on the current display?
+        return true;
+    }
+
+    virtual bool isVsyncTimingSupported() {
+        // Platform-specific vsync timing metadata is available
+        return true;
+    }
+
     virtual bool isRenderThreadSupported() {
         // Render thread is supported by default
         return true;
@@ -304,7 +318,8 @@ public:
     virtual void prepareToRender() {
         // Allow renderers to perform any final preparations for
         // rendering after they have been selected to render. Such
-        // preparations might include clearing the window.
+        // preparations might include clearing the window or registering
+        // a vsync callback.
     }
 
     RendererType getRendererType() {
@@ -498,6 +513,14 @@ public:
         // Nothing
     }
 
+    // On some platforms like macOS, the renderer can be notified about the
+    // current and next vsync timestamps. Other platforms may only supply a timestamp (Wayland).
+    // In this case set deadline to -1.0.
+    virtual void notifyVsyncTimestamps(double timestamp, double deadline) {
+        (void)timestamp;
+        (void)deadline;
+    }
+
 #ifdef HAVE_EGL
     // By default we can't do EGL
     virtual bool canExportEGL() {
@@ -531,6 +554,13 @@ public:
         return false;
     }
 #endif
+
+    virtual void ImGui_initBackend() {
+    }
+
+    virtual void ImGui_deinitBackend() {
+    }
+
 
 protected:
     InitFailureReason m_InitFailureReason;

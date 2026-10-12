@@ -19,6 +19,13 @@ public:
 
     void reload();
 
+    enum AudioRenderer
+    {
+        AUDIO_RENDERER_COREAUDIO,
+        AUDIO_RENDERER_SDL
+    };
+    Q_ENUM(AudioRenderer)
+
     enum AudioConfig
     {
         AC_STEREO,
@@ -26,6 +33,14 @@ public:
         AC_71_SURROUND
     };
     Q_ENUM(AudioConfig)
+
+    enum SpatialAudioConfig
+    {
+        SAC_FIXED,
+        SAC_HEAD_TRACKED,
+        SAC_DISABLED
+    };
+    Q_ENUM(SpatialAudioConfig)
 
     enum VideoCodecConfig
     {
@@ -138,6 +153,21 @@ public:
         KSM_META = 0x08,
     };
     Q_ENUM(KeyboardShortcutModifier);
+    enum FramePacingMode
+    {
+        FRAME_PACING_IMMEDIATE = 0,
+        FRAME_PACING_DISPLAY_LOCKED = 1,
+    };
+    Q_ENUM(FramePacingMode)
+
+    enum PresentMode
+    {
+        PRESENT_AUTO = 0,
+        PRESENT_FIXED = 1,
+        PRESENT_VRR = 2,
+        PRESENT_NO_VSYNC = 3,
+    };
+    Q_ENUM(PresentMode)
 
     Q_PROPERTY(int width MEMBER width NOTIFY displayModeChanged)
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
@@ -161,6 +191,7 @@ public:
     Q_PROPERTY(bool detectNetworkBlocking MEMBER detectNetworkBlocking NOTIFY detectNetworkBlockingChanged)
     Q_PROPERTY(bool showPerformanceOverlay MEMBER showPerformanceOverlay NOTIFY showPerformanceOverlayChanged)
     Q_PROPERTY(AudioConfig audioConfig MEMBER audioConfig NOTIFY audioConfigChanged)
+    Q_PROPERTY(SpatialAudioConfig spatialAudioConfig MEMBER spatialAudioConfig NOTIFY spatialAudioConfigChanged)
     Q_PROPERTY(VideoCodecConfig videoCodecConfig MEMBER videoCodecConfig NOTIFY videoCodecConfigChanged)
     Q_PROPERTY(bool enableHdr MEMBER enableHdr NOTIFY enableHdrChanged)
     Q_PROPERTY(bool enableYUV444 MEMBER enableYUV444 NOTIFY enableYUV444Changed)
@@ -187,6 +218,11 @@ public:
     Q_PROPERTY(bool disableCtrlEscStartMenu MEMBER disableCtrlEscStartMenu NOTIFY ctrlEscBehaviorChanged)
     Q_PROPERTY(QString activeStreamQuitShortcutKey MEMBER activeStreamQuitShortcutKey NOTIFY activeStreamQuitShortcutChanged)
     Q_PROPERTY(int activeStreamQuitShortcutModifiers MEMBER activeStreamQuitShortcutModifiers NOTIFY activeStreamQuitShortcutChanged)
+    Q_PROPERTY(AudioRenderer audioRenderer MEMBER audioRenderer NOTIFY audioRendererChanged)
+    Q_PROPERTY(FramePacingMode framePacingMode MEMBER framePacingMode NOTIFY framePacingModeChanged)
+    Q_PROPERTY(PresentMode presentMode MEMBER presentMode NOTIFY presentModeChanged)
+    Q_PROPERTY(bool showPerformanceGraphs MEMBER showPerformanceGraphs NOTIFY showPerformanceGraphsChanged)
+    Q_PROPERTY(int vtMetalFramesInFlight MEMBER vtMetalFramesInFlight NOTIFY vtMetalFramesInFlightChanged)
 
     Q_INVOKABLE bool retranslate();
     Q_INVOKABLE QString getActiveStreamQuitShortcutText() const;
@@ -224,6 +260,7 @@ public:
     int audioDropThresholdMs;
     int packetSize;
     AudioConfig audioConfig;
+    SpatialAudioConfig spatialAudioConfig;
     VideoCodecConfig videoCodecConfig;
     bool enableHdr;
     bool enableYUV444;
@@ -242,6 +279,11 @@ public:
     QString activeStreamQuitShortcutKey;
     int activeStreamQuitShortcutModifiers;
     RendererSelection rendererSelection;
+    AudioRenderer audioRenderer;
+    FramePacingMode framePacingMode;
+    PresentMode presentMode;
+    bool showPerformanceGraphs;
+    int vtMetalFramesInFlight;
 
 signals:
     void displayModeChanged();
@@ -258,6 +300,7 @@ signals:
     void absoluteMouseModeChanged();
     void absoluteTouchModeChanged();
     void audioConfigChanged();
+    void spatialAudioConfigChanged();
     void videoCodecConfigChanged();
     void enableHdrChanged();
     void enableYUV444Changed();
@@ -286,6 +329,11 @@ signals:
     void ctrlEscBehaviorChanged();
     void activeStreamQuitShortcutChanged();
     void rendererSelectionChanged();
+    void audioRendererChanged();
+    void framePacingModeChanged();
+    void presentModeChanged();
+    void showPerformanceGraphsChanged();
+    void vtMetalFramesInFlightChanged();
 
 private:
     explicit StreamingPreferences(QQmlEngine *qmlEngine);
