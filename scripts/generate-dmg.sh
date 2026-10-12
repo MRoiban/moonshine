@@ -80,12 +80,17 @@ echo Removing dSYM files from app bundle
 find $BUILD_FOLDER/app/Moonlight.app/ -name '*.dSYM' | xargs rm -rf
 
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  [ -n "$MOONLIGHT_PROVISION_PROFILE" ] || fail "Set MOONLIGHT_PROVISION_PROFILE to a profile granting the spatial audio entitlements."
-  cp "$MOONLIGHT_PROVISION_PROFILE" "$BUILD_FOLDER/app/Moonlight.app/Contents/embedded.provisionprofile" || fail "Provisioning profile copy failed!"
+  # Spatial audio profile access and head tracking are restricted entitlements
+  # that only work with a matching provisioning profile. Without one, sign
+  # without entitlements and CoreAudio falls back to generic spatialization.
+  ENTITLEMENT_ARGS=()
+  if [ -n "$MOONLIGHT_PROVISION_PROFILE" ]; then
+    cp "$MOONLIGHT_PROVISION_PROFILE" "$BUILD_FOLDER/app/Moonlight.app/Contents/embedded.provisionprofile" || fail "Provisioning profile copy failed!"
+    ENTITLEMENT_ARGS=(--entitlements "$SOURCE_ROOT/app/deploy/macos/spatial-audio.entitlements")
+  fi
 
   echo Signing app bundle
-  codesign --force --deep --options runtime --timestamp \
-    --entitlements "$SOURCE_ROOT/app/deploy/macos/spatial-audio.entitlements" \
+  codesign --force --deep --options runtime --timestamp "${ENTITLEMENT_ARGS[@]}" \
     --sign "$SIGNING_IDENTITY" "$BUILD_FOLDER/app/Moonlight.app" || fail "Signing failed!"
 fi
 
