@@ -414,7 +414,7 @@ void DevUISettings::Render()
                 ImGui::SameLine();
                 HelpMarker(
                     "ProMotion displays like on MacBook Pro are not true VRR displays and only operate at a few fixed rates (120, 60, 50, 48). "
-                    "This option lets Moonlight treat it like a VRR display and use variable present durations. This may result in stuttering. "
+                    "This option lets Moonshine treat it like a VRR display and use variable present durations. This may result in stuttering. "
                     "Use an external adaptive refresh display to fully utilize VRR."
                 );
             }
@@ -528,7 +528,7 @@ void DevUISettings::Render()
                     ImGui::Text("Audio buffer: %.2fms", metrics.audioInBufferMs);
                     ImGui::Text("Drops (behind/underrun): %d/%d", metrics.audioDropCount, metrics.audioDropCountUnderrun);
                     ImGui::SameLine();
-                    HelpMarker("To prevent latency, an audio block is considered \"behind\" and skipped if Moonlight has over 30ms of pending audio. An audio underrun occurs when there is not enough received audio data in the buffer to supply the audio device. Both of these situations cause an audible glitch.");
+                    HelpMarker("To prevent latency, an audio block is considered \"behind\" and skipped if Moonshine has over 30ms of pending audio. An audio underrun occurs when there is not enough received audio data in the buffer to supply the audio device. Both of these situations cause an audible glitch.");
 
                     ImGui::Text("Render mode: %s %s %s %s",
                         metrics.spatialAudioActive
@@ -554,7 +554,7 @@ void DevUISettings::Render()
                         configChanged |= ImGui::Checkbox("Enable head-tracking", &cfg.useHeadTracking);
                         ImGui::SameLine();
                         HelpMarker(
-                            "Head-tracking works best when Game Mode is active and Moonlight is running fullscreen. Game Mode reduces Bluetooth latency in AirPods from 160ms to about 80ms, although this number is not reflected in the hardware latency number.\n\n"
+                            "Head-tracking works best when Game Mode is active and Moonshine is running fullscreen. Game Mode reduces Bluetooth latency in AirPods from 160ms to about 80ms, although this number is not reflected in the hardware latency number.\n\n"
                             "Audio glitches are more common when head-tracking is enabled.");
                     }
                 } else
@@ -564,7 +564,7 @@ void DevUISettings::Render()
                     ImGui::Text("Audio buffer: %.2fms", metrics.audioInBufferMs);
                     ImGui::Text("Drop count: %d", metrics.audioDropCount);
                     ImGui::SameLine();
-                    HelpMarker("To prevent latency, an audio block is dropped if Moonlight's outgoing audio buffer rises above 30ms. This causes an audible glitch.");
+                    HelpMarker("To prevent latency, an audio block is dropped if Moonshine's outgoing audio buffer rises above 30ms. This causes an audible glitch.");
                 }
             }
 

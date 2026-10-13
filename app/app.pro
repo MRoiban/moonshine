@@ -2,10 +2,10 @@ QT += core quick network quickcontrols2 svg
 CONFIG += c++17
 
 unix:!macx {
-    TARGET = moonlight
+    TARGET = moonshine
 } else {
     # On macOS, this is the name displayed in the global menu bar
-    TARGET = Moonlight
+    TARGET = Moonshine
 }
 
 include(../globaldefs.pri)
@@ -225,6 +225,7 @@ SOURCES += \
     wm.cpp
 
 HEADERS += \
+    settings/settingsmigration.h \
     SDL_compat.h \
     backend/nvaddress.h \
     backend/nvapp.h \
@@ -586,13 +587,13 @@ unix:!macx: {
 
     target.path = $$PREFIX/$$BINDIR/
 
-    desktop.files = deploy/linux/com.moonlight_stream.Moonlight.desktop
+    desktop.files = deploy/linux/com.mroiban.Moonshine.desktop
     desktop.path = $$PREFIX/$$DATADIR/applications/
 
     icons.files = res/moonlight.svg
     icons.path = $$PREFIX/$$DATADIR/icons/hicolor/scalable/apps/
 
-    appstream.files = deploy/linux/com.moonlight_stream.Moonlight.appdata.xml
+    appstream.files = deploy/linux/com.mroiban.Moonshine.appdata.xml
     appstream.path = $$PREFIX/$$DATADIR/metainfo/
 
     INSTALLS += target desktop icons appstream
@@ -600,18 +601,18 @@ unix:!macx: {
 win32 {
     RC_ICONS = moonlight.ico
     QMAKE_TARGET_COMPANY = Moonlight Game Streaming Project
-    QMAKE_TARGET_DESCRIPTION = Moonlight Game Streaming Client
-    QMAKE_TARGET_PRODUCT = Moonlight
+    QMAKE_TARGET_DESCRIPTION = Moonshine Game Streaming Client
+    QMAKE_TARGET_PRODUCT = Moonshine
 
     CONFIG -= embed_manifest_exe
     QMAKE_LFLAGS += /MANIFEST:embed /MANIFESTINPUT:$${PWD}/Moonlight.exe.manifest
 }
 macx {
     # Create Info.plist in object dir with the correct version string
-    system(cp $$PWD/Info.plist $$OUT_PWD/moonlight-Info.plist)
-    system(sed -i -e 's/VERSION/$$cat(version.txt)/g' $$OUT_PWD/moonlight-Info.plist)
+    system(cp $$PWD/Info.plist $$OUT_PWD/moonshine-Info.plist)
+    system(sed -i -e 's/VERSION/$$cat(version.txt)/g' $$OUT_PWD/moonshine-Info.plist)
 
-    QMAKE_INFO_PLIST = $$OUT_PWD/moonlight-Info.plist
+    QMAKE_INFO_PLIST = $$OUT_PWD/moonshine-Info.plist
 
     APP_BUNDLE_RESOURCES.files = moonlight.icns deploy/macos/spatial-audio.entitlements
     APP_BUNDLE_RESOURCES.path = Contents/Resources

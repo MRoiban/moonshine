@@ -53,7 +53,7 @@ pushd $BUILD_FOLDER
 qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="$APPLE_DEVICE_ARCHS" CONFIG+=no-release-dmg || fail "Qmake failed!"
 popd
 
-echo Compiling Moonlight in $BUILD_CONFIG configuration
+echo Compiling Moonshine in $BUILD_CONFIG configuration
 mkdir -p $BUILD_FOLDER/app
 pushd $BUILD_FOLDER/app
 qmake $SOURCE_ROOT/app/app.pro QMAKE_APPLE_DEVICE_ARCHS="$APPLE_DEVICE_ARCHS" || fail "App qmake failed!"
@@ -66,18 +66,18 @@ popd
 
 echo Saving dSYM file
 pushd $BUILD_FOLDER
-dsymutil app/Moonlight.app/Contents/MacOS/Moonlight -o Moonlight-$VERSION.dsym || fail "dSYM creation failed!"
-cp -R Moonlight-$VERSION.dsym $INSTALLER_FOLDER || fail "dSYM copy failed!"
+dsymutil app/Moonshine.app/Contents/MacOS/Moonshine -o Moonshine-$VERSION.dsym || fail "dSYM creation failed!"
+cp -R Moonshine-$VERSION.dsym $INSTALLER_FOLDER || fail "dSYM copy failed!"
 popd
 
 echo Creating app bundle
 EXTRA_ARGS=
 if [ "$BUILD_CONFIG" == "Debug" ]; then EXTRA_ARGS="$EXTRA_ARGS -use-debug-libs"; fi
 echo Extra deployment arguments: $EXTRA_ARGS
-macdeployqt $BUILD_FOLDER/app/Moonlight.app $EXTRA_ARGS -qmldir=$SOURCE_ROOT/app/gui -appstore-compliant || fail "macdeployqt failed!"
+macdeployqt $BUILD_FOLDER/app/Moonshine.app $EXTRA_ARGS -qmldir=$SOURCE_ROOT/app/gui -appstore-compliant || fail "macdeployqt failed!"
 
 echo Removing dSYM files from app bundle
-find $BUILD_FOLDER/app/Moonlight.app/ -name '*.dSYM' | xargs rm -rf
+find $BUILD_FOLDER/app/Moonshine.app/ -name '*.dSYM' | xargs rm -rf
 
 if [ "$SIGNING_IDENTITY" != "" ]; then
   # Spatial audio profile access and head tracking are restricted entitlements
@@ -85,25 +85,25 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
   # without entitlements and CoreAudio falls back to generic spatialization.
   ENTITLEMENT_ARGS=()
   if [ -n "$MOONLIGHT_PROVISION_PROFILE" ]; then
-    cp "$MOONLIGHT_PROVISION_PROFILE" "$BUILD_FOLDER/app/Moonlight.app/Contents/embedded.provisionprofile" || fail "Provisioning profile copy failed!"
+    cp "$MOONLIGHT_PROVISION_PROFILE" "$BUILD_FOLDER/app/Moonshine.app/Contents/embedded.provisionprofile" || fail "Provisioning profile copy failed!"
     ENTITLEMENT_ARGS=(--entitlements "$SOURCE_ROOT/app/deploy/macos/spatial-audio.entitlements")
   fi
 
   echo Signing app bundle
   codesign --force --deep --options runtime --timestamp "${ENTITLEMENT_ARGS[@]}" \
-    --sign "$SIGNING_IDENTITY" "$BUILD_FOLDER/app/Moonlight.app" || fail "Signing failed!"
+    --sign "$SIGNING_IDENTITY" "$BUILD_FOLDER/app/Moonshine.app" || fail "Signing failed!"
 fi
 
 echo Creating DMG
-DMG_OUTPUT=$INSTALLER_FOLDER/Moonlight.dmg
+DMG_OUTPUT=$INSTALLER_FOLDER/Moonshine.dmg
 DMG_SOURCE_FOLDER=$INSTALLER_FOLDER/dmg-source
 rm -f "$DMG_OUTPUT"
 mkdir -p "$DMG_SOURCE_FOLDER"
-ditto "$BUILD_FOLDER/app/Moonlight.app" "$DMG_SOURCE_FOLDER/Moonlight.app" || fail "Failed to stage app bundle for DMG!"
+ditto "$BUILD_FOLDER/app/Moonshine.app" "$DMG_SOURCE_FOLDER/Moonshine.app" || fail "Failed to stage app bundle for DMG!"
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  create-dmg --volname Moonlight --app-drop-link 425 120 --codesign "$SIGNING_IDENTITY" "$DMG_OUTPUT" "$DMG_SOURCE_FOLDER" || fail "create-dmg failed!"
+  create-dmg --volname Moonshine --app-drop-link 425 120 --codesign "$SIGNING_IDENTITY" "$DMG_OUTPUT" "$DMG_SOURCE_FOLDER" || fail "create-dmg failed!"
 else
-  create-dmg --volname Moonlight --app-drop-link 425 120 "$DMG_OUTPUT" "$DMG_SOURCE_FOLDER"
+  create-dmg --volname Moonshine --app-drop-link 425 120 "$DMG_OUTPUT" "$DMG_SOURCE_FOLDER"
   case $? in
     0) ;;
     2) ;;
@@ -113,11 +113,11 @@ fi
 
 if [ "$NOTARY_KEYCHAIN_PROFILE" != "" ]; then
   echo Uploading to App Notary service
-  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Moonlight.dmg || fail "Notary submission failed"
+  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Moonshine.dmg || fail "Notary submission failed"
 
   echo Stapling notary ticket to DMG
-  xcrun stapler staple -v $INSTALLER_FOLDER/Moonlight.dmg || fail "Notary ticket stapling failed!"
+  xcrun stapler staple -v $INSTALLER_FOLDER/Moonshine.dmg || fail "Notary ticket stapling failed!"
 fi
 
-mv $INSTALLER_FOLDER/Moonlight.dmg $INSTALLER_FOLDER/Moonlight-$VERSION.dmg
+mv $INSTALLER_FOLDER/Moonshine.dmg $INSTALLER_FOLDER/Moonshine-$VERSION.dmg
 echo Build successful

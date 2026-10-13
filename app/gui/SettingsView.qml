@@ -138,7 +138,7 @@ Flickable {
 
     Component.onDestruction: {
         // Also save preferences on destruction, since we won't get a
-        // deactivating callback if the user just closes Moonlight
+        // deactivating callback if the user just closes Moonshine
         commitAudioThresholdSettings()
         commitActiveStreamQuitShortcutSettings()
         StreamingPreferences.save()
@@ -857,7 +857,7 @@ Flickable {
                             ToolTip.visible: hovered
                             ToolTip.text:
                                 qsTr("CoreAudio is a native audio renderer with support for spatial audio.\n\n") +
-                                qsTr("SDL is the classic Moonlight audio renderer and is likely more stable.")
+                                qsTr("SDL is the classic Moonshine audio renderer and is likely more stable.")
                         }
                     }
                 }
@@ -1005,12 +1005,12 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("SDL audio only. Default: 0 ms. Set this above 0 if you want Moonlight to wait for buffered SDL audio before starting playback or resuming after an underrun.")
+                    ToolTip.text: qsTr("SDL audio only. Default: 0 ms. Set this above 0 if you want Moonshine to wait for buffered SDL audio before starting playback or resuming after an underrun.")
                 }
 
                 Label {
                     width: parent.width
-                    text: qsTr("SDL audio: maximum queued audio in Moonlight's buffer (ms)")
+                    text: qsTr("SDL audio: maximum queued audio in Moonshine's buffer (ms)")
                     font.pointSize: 12
                     wrapMode: Text.Wrap
                 }
@@ -1031,7 +1031,7 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("SDL audio only. Default: 30 ms. Increase this if you want Moonlight to tolerate more queued audio before dropping new samples.")
+                    ToolTip.text: qsTr("SDL audio only. Default: 30 ms. Increase this if you want Moonshine to tolerate more queued audio before dropping new samples.")
                 }
 
 
@@ -1054,7 +1054,7 @@ Flickable {
                 CheckBox {
                     id: muteOnFocusLossCheck
                     width: parent.width
-                    text: qsTr("Mute audio stream when Moonlight is not the active window")
+                    text: qsTr("Mute audio stream when Moonshine is not the active window")
                     font.pointSize: 12
                     visible: SystemProperties.hasDesktopEnvironment
                     checked: StreamingPreferences.muteOnFocusLoss
@@ -1065,7 +1065,7 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Mutes Moonlight's audio when you Alt+Tab out of the stream or click on a different window.")
+                    ToolTip.text: qsTr("Mutes Moonshine's audio when you Alt+Tab out of the stream or click on a different window.")
                 }
             }
         }
@@ -1285,7 +1285,7 @@ Flickable {
                         if (StreamingPreferences.language !== new_language) {
                             StreamingPreferences.language = languageListModel.get(currentIndex).val
                             if (!StreamingPreferences.retranslate()) {
-                                ToolTip.show(qsTr("You must restart Moonlight for this change to take effect"), 5000)
+                                ToolTip.show(qsTr("You must restart Moonshine for this change to take effect"), 5000)
                             }
                             else {
                                 // Force the back operation to pop any AppView pages that exist.
@@ -1465,7 +1465,7 @@ Flickable {
                         ToolTip.timeout: 10000
                         ToolTip.visible: hovered
                         ToolTip.text: qsTr("This enables the capture of system-wide keyboard shortcuts like Alt+Tab that would normally be handled by the client OS while streaming.") + "\n\n" +
-                                      qsTr("NOTE: Certain keyboard shortcuts like Ctrl+Alt+Del on Windows cannot be intercepted by any application, including Moonlight.")
+                                      qsTr("NOTE: Certain keyboard shortcuts like Ctrl+Alt+Del on Windows cannot be intercepted by any application, including Moonshine.")
                     }
 
                     AutoResizingComboBox {
@@ -1539,7 +1539,7 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 10000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("When the stream window is focused, Moonlight temporarily changes macOS to send F1-F12 instead of brightness, volume, and media keys. The original macOS behavior is restored when the stream loses focus or ends.")
+                    ToolTip.text: qsTr("When the stream window is focused, Moonshine temporarily changes macOS to send F1-F12 instead of brightness, volume, and media keys. The original macOS behavior is restored when the stream loses focus or ends.")
                 }
 
                 Label {
@@ -1889,7 +1889,7 @@ Flickable {
                 CheckBox {
                     id: backgroundGamepadCheck
                     width: parent.width
-                    text: qsTr("Process gamepad input when Moonlight is in the background")
+                    text: qsTr("Process gamepad input when Moonshine is in the background")
                     font.pointSize: 12
                     visible: SystemProperties.hasDesktopEnvironment
                     checked: StreamingPreferences.backgroundGamepad
@@ -1900,7 +1900,7 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Allows Moonlight to capture gamepad inputs even if it's not the current window in focus")
+                    ToolTip.text: qsTr("Allows Moonshine to capture gamepad inputs even if it's not the current window in focus")
                 }
             }
         }

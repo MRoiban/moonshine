@@ -1,14 +1,18 @@
-# Moonlight PC
+# Moonshine
 
-[Moonlight PC](https://moonlight-stream.org) is an open source PC client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).
+Moonshine is a personal fork of [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt), currently based on Moonlight 6.2.0, for independent features while continuing to track upstream changes. It streams games and applications from PCs running [Sunshine](https://github.com/LizardByte/Sunshine) or NVIDIA GameStream.
 
-Moonlight also has mobile versions for [Android](https://github.com/moonlight-stream/moonlight-android) and [iOS](https://github.com/moonlight-stream/moonlight-ios).
+Licensed under GPL-3.0; see [LICENSE](LICENSE). Credit goes to the Moonlight project and its contributors, and to Andy Grundman, whose CoreAudio spatial audio and Metal frame pacing work is integrated in this fork.
 
-You can follow development on our [Discord server](https://moonlight-stream.org/discord) and help translate Moonlight into your language on [Weblate](https://hosted.weblate.org/projects/moonlight/moonlight-qt/).
+## Tracking upstream
 
- [![Build](https://img.shields.io/github/actions/workflow/status/moonlight-stream/moonlight-qt/build.yml?branch=master)](https://github.com/moonlight-stream/moonlight-qt/actions/workflows/build.yml?query=branch%3Amaster)
- [![Downloads](https://img.shields.io/github/downloads/moonlight-stream/moonlight-qt/total)](https://github.com/moonlight-stream/moonlight-qt/releases)
- [![Translation Status](https://hosted.weblate.org/widgets/moonlight/-/moonlight-qt/svg-badge.svg)](https://hosted.weblate.org/projects/moonlight/moonlight-qt/)
+The `upstream` remote tracks Moonlight. To bring in upstream changes:
+
+```sh
+git fetch upstream && git merge upstream/master
+```
+
+Moonshine uses its own application identity and settings store. On first launch it copies all settings from Moonlight if its own store is empty, leaving Moonlight’s settings intact for side-by-side use. Automatic update checks are disabled until a compatible Moonshine update feed is available.
 
 ## Features
  - Hardware accelerated video decoding on Windows, Mac, and Linux
@@ -21,7 +25,9 @@ You can follow development on our [Discord server](https://moonlight-stream.org/
  - Support for both pointer capture (for games) and direct mouse control (for remote desktop)
  - Support for passing system-wide keyboard shortcuts like Alt+Tab to the host
  
-## Downloads
+## Upstream Moonlight downloads
+
+These links are for official Moonlight builds. Build Moonshine from source using the instructions below.
 - [Windows, macOS, and Steam Link](https://github.com/moonlight-stream/moonlight-qt/releases)
 - [Snap (for Ubuntu-based Linux distros)](https://snapcraft.io/moonlight)
 - [Flatpak (for other Linux distros)](https://flathub.org/apps/details/com.moonlight_stream.Moonlight)
@@ -88,7 +94,7 @@ for different architectures, which handle building deps and extra linking for yo
 
 ### Build Setup Steps
 1. Install the latest Qt SDK (and optionally, the Qt Creator IDE) from https://www.qt.io/download
-    * You can install Qt via Homebrew on macOS, but you will need to use `brew install qt --with-debug` to be able to create debug builds of Moonlight.
+    * You can install Qt via Homebrew on macOS, but you will need to use `brew install qt --with-debug` to be able to create debug builds of Moonshine.
     * You may also use your Linux distro's package manager for the Qt SDK as long as the packages are Qt 5.12 or later.
     * This step is not required for building on Steam Link, because the Steam Link SDK includes Qt 5.14.
 2. Download submodules and dependencies
@@ -101,7 +107,7 @@ for different architectures, which handle building deps and extra linking for yo
         * For macOS builds, use `scripts/generate-dmg.sh`. Execute this script from the root of the repository and ensure Qt's `bin` folder is in your `$PATH`.
         * For Steam Link builds, run `scripts/build-steamlink-app.sh` from the root of the repository.
     * To build from the command line for development use on macOS or Linux, run `qmake6 moonlight-qt.pro` then `make debug` or `make release`.
-        * The final binary will be placed in `app/moonlight`.
+        * The final binary will be placed in `app/moonshine` on Linux or `app/Moonshine.app` on macOS.
     * To create an embedded build for a single-purpose device, use `qmake6 "CONFIG+=embedded" moonlight-qt.pro` and build normally.
         * This build will lack windowed mode, Discord/Help links, and other features that don't make sense on an embedded device.
         * For platforms with poor GPU performance, add `"CONFIG+=gpuslow"` to prefer direct KMSDRM rendering over GL/Vulkan renderers. Direct KMSDRM rendering can use dedicated YUV/RGB conversion and scaling hardware rather than slower GPU shaders for these operations.

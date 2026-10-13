@@ -5,6 +5,10 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+// The upstream manifest format is incompatible with GitHub releases/latest.
+// Keep checks disabled until Moonshine publishes a compatible update feed.
+static constexpr bool kUpdateChecksEnabled = false;
+
 AutoUpdateChecker::AutoUpdateChecker(QObject *parent) :
     QObject(parent)
 {
@@ -20,7 +24,7 @@ AutoUpdateChecker::AutoUpdateChecker(QObject *parent) :
             this, &AutoUpdateChecker::handleUpdateCheckRequestFinished);
 
     QString currentVersion(VERSION_STR);
-    qDebug() << "Current Moonlight version:" << currentVersion;
+    qDebug() << "Current Moonshine version:" << currentVersion;
     parseStringToVersionQuad(currentVersion, m_CurrentVersionQuad);
 
     // Should at least have a 1.0-style version number
@@ -29,6 +33,11 @@ AutoUpdateChecker::AutoUpdateChecker(QObject *parent) :
 
 void AutoUpdateChecker::start()
 {
+    if (!kUpdateChecksEnabled) {
+        qInfo() << "Moonshine update checks are disabled";
+        return;
+    }
+
     if (!m_Nam) {
         Q_ASSERT(m_Nam);
         return;
@@ -180,7 +189,7 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
                     qDebug() << "Found update manifest match for current platform";
 
                     QString latestVersion = updateObj["version"].toString();
-                    qDebug() << "Latest version of Moonlight for this platform is:" << latestVersion;
+                    qDebug() << "Latest version of Moonshine for this platform is:" << latestVersion;
 
                     QVector<int> latestVersionQuad;
                     parseStringToVersionQuad(latestVersion, latestVersionQuad);

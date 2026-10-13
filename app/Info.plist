@@ -5,7 +5,7 @@
 	<key>GCSupportsGameMode</key>
 	<true/>
 	<key>CFBundleExecutable</key>
-	<string>Moonlight</string>
+	<string>Moonshine</string>
 	<key>LSSupportsGameMode</key>
 	<true/>
 	<key>CFBundleGetInfoString</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleIconFile</key>
 	<string>moonlight</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.moonlight-stream.Moonlight</string>
+	<string>com.mroiban.Moonshine</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>CFBundlePackageType</key>
@@ -43,7 +43,7 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Moonlight uses the local network to connect to your gaming PC for streaming.</string>
+	<string>Moonshine uses the local network to connect to your gaming PC for streaming.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_nvstream._tcp</string>
@@ -52,7 +52,9 @@
 	<string>VERSION</string>
 	<key>CFBundleShortVersionString</key>
 	<string>VERSION</string>
+	<key>CFBundleName</key>
+	<string>Moonshine</string>
 	<key>CFBundleDisplayName</key>
-	<string>Moonlight</string>
+	<string>Moonshine</string>
 </dict>
 </plist>

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-	<id>com.moonlight_stream.Moonlight</id>
+	<id>com.mroiban.Moonshine</id>
 	<metadata_license>CC0-1.0</metadata_license>
 	<project_license>GPL-3.0+</project_license>
-	<name>Moonlight</name>
+	<name>Moonshine</name>
 	<summary>Stream games and other applications from another PC running Sunshine or GeForce Experience</summary>
 
 	<description>
-		<p>Moonlight can stream games and other applications from another PC with Sunshine or GeForce Experience software installed.</p>
+		<p>Moonshine can stream games and other applications from another PC with Sunshine or GeForce Experience software installed.</p>
 		<p>Features include:</p>
 		<ul>
 			<li>Hardware accelerated video decoding with VAAPI, VDPAU, and Vulkan Video support</li>
@@ -20,17 +20,17 @@
 		</ul>
 	</description>
 
-	<url type="homepage">https://moonlight-stream.org</url>
-	<url type="bugtracker">https://github.com/moonlight-stream/moonlight-qt/issues</url>
+	<url type="homepage">https://github.com/MRoiban/moonshine</url>
+	<url type="bugtracker">https://github.com/MRoiban/moonshine/issues</url>
 	<url type="help">https://github.com/moonlight-stream/moonlight-docs/wiki/Setup-Guide</url>
-	<url type="vcs-browser">https://github.com/moonlight-stream/moonlight-qt</url>
+	<url type="vcs-browser">https://github.com/MRoiban/moonshine</url>
 	<developer id="org.moonlight-stream">
 		<name>Moonlight Game Streaming Team</name>
 	</developer>
 	<update_contact>cameron@moonlight-stream.org</update_contact>
-	<launchable type="desktop-id">com.moonlight_stream.Moonlight.desktop</launchable>
+	<launchable type="desktop-id">com.mroiban.Moonshine.desktop</launchable>
 	<provides>
-		<binary>moonlight</binary>
+		<binary>moonshine</binary>
 	</provides>
 	<content_rating type="oars-1.1" />	
 
