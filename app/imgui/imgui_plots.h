@@ -4,6 +4,7 @@
 #include "streaming/video/ffmpeg-renderers/renderer.h"
 
 #include <array>
+#include <mutex>
 
 struct Plot {
     const PlotDesc& desc;
@@ -18,6 +19,8 @@ class ImGuiPlots
     static ImGuiPlots& instance();
 
 #ifndef IMGUI_DISABLE
+    // ImGui contexts and the SDL backend are shared by main and render threads.
+    std::mutex& contextMutex() { return m_ContextMutex; }
     void ImGui_init(IFFmpegRenderer* renderer);
     void ImGui_deinit(IFFmpegRenderer* renderer);
 #endif
@@ -62,4 +65,5 @@ class ImGuiPlots
 
     std::array<Plot, PlotCount> plots_;
     bool m_isEnabled;
+    std::mutex m_ContextMutex;
 };

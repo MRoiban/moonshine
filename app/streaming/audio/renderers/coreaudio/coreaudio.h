@@ -78,7 +78,8 @@ private:
     uint32_t m_BufferFilledBytes {};
     void statsIncDeviceOverload();
     void statsTrackRender(uint64_t, const AudioTimeStamp *, uint32_t, bool);
-    uint32_t m_DropCount {};
-    uint32_t m_DropCountUnderrun {};
+    std::atomic<uint32_t> m_DropCount {};
+    std::atomic<uint32_t> m_DropCountUnderrun {};
+    bool m_SeenAudio = true;
     std::atomic<int> m_QueuedAudioSize {};
 };

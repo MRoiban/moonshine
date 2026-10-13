@@ -458,6 +458,7 @@ macx {
         streaming/audio/renderers/coreaudio/coreaudio_helpers.h \
         streaming/audio/renderers/coreaudio/TPCircularBuffer.h \
         streaming/video/ffmpeg-renderers/pacer/displaylink_source.h \
+        streaming/video/ffmpeg-renderers/pacer/mainthreadcall.h \
         streaming/video/ffmpeg-renderers/vt.h
 }
 discord-rpc {

@@ -128,6 +128,7 @@ class FramePacer: public IFramePacer
     int64_t m_RemoteAnchorPts;
     uint64_t m_LocalAnchorUs;
 
+    bool m_ImGuiInitialized = false;
     SDL_Thread* m_RenderThread;
     SDL_Thread* m_VsyncThread;
     IVsyncSource* m_VsyncSource;

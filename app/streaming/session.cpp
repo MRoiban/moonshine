@@ -7,6 +7,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui/devui.h"
+#include "imgui/imgui_plots.h"
 #endif
 
 #include <Limelight.h>
@@ -2059,10 +2060,18 @@ void Session::exec()
 #if defined(HAVE_FFMPEG) && !defined(IMGUI_DISABLE)
         // let ImGui read keyboard/mouse events. If interacting with a UI element, we will check
         // io.WantCaptureMouse and io.WantCaptureKeyboard below
-        if (ImGui::GetCurrentContext()) {
-            ImGuiIO& io = ImGui::GetIO();
-            if (io.BackendPlatformUserData != nullptr) {
-                ImGui_ImplSDL2_ProcessEvent(&event);
+        {
+            std::lock_guard<std::mutex> lock(ImGuiPlots::instance().contextMutex());
+            if (ImGui::GetCurrentContext()) {
+                ImGuiIO& io = ImGui::GetIO();
+                if (io.BackendPlatformUserData != nullptr) {
+                    if (event.type == SDL_USEREVENT && event.user.code == SDL_CODE_IMGUI_NEW_FRAME) {
+                        ImGui_ImplSDL2_NewFrame();
+                    }
+                    else {
+                        ImGui_ImplSDL2_ProcessEvent(&event);
+                    }
+                }
             }
         }
 #endif
@@ -2107,6 +2116,8 @@ void Session::exec()
             case SDL_CODE_GAMECONTROLLER_SET_ADAPTIVE_TRIGGERS:
                 m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.user.data1,
                                                     (DualSenseOutputReport *)event.user.data2);
+                break;
+            case SDL_CODE_IMGUI_NEW_FRAME:
                 break;
             case SDL_CODE_SET_WINDOW_MODE:
                 setWindowMode((uint32_t)(uintptr_t)event.user.data1);

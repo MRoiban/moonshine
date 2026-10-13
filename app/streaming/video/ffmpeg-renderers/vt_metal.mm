@@ -3,6 +3,7 @@
 #define AVMediaType AVMediaType_FFmpeg
 #include "vt.h"
 #include "pacer/displaylink_source.h"
+#include "pacer/mainthreadcall.h"
 #undef AVMediaType
 
 #include "imgui.h"
@@ -82,10 +83,6 @@ struct PresentCallbackState
     std::mutex pendingFramesMutex;
     std::deque<PresentedFrameInfo> pendingFrames;
     std::atomic<bool> stopping{false};
-
-    std::atomic<int> callbacksInFlight{0};
-    std::mutex callbacksMutex;
-    std::condition_variable callbacksCv;
 
     std::atomic<double> lastPresented{0.0};
     std::atomic<double> averageGPUTime{1.0 / 240.0};
@@ -169,13 +166,9 @@ public:
     { @autoreleasepool {
         m_PresentState->stopping.store(true);
 
-        {
-            // ensure all outstanding callbacks can complete
-            std::unique_lock<std::mutex> lock(m_PresentState->callbacksMutex);
-            m_PresentState->callbacksCv.wait(lock, [&] {
-                return m_PresentState->callbacksInFlight.load() == 0;
-            });
-        }
+        // Handlers retain only PresentCallbackState, never this renderer. A
+        // drawable may never be presented (hidden/aborted), so waiting for its
+        // presented handler here can hang forever during window destruction.
 
         // hide Metal HUD so it doesn't appear over the Qt UI
         showMetalHud(false);
@@ -186,6 +179,7 @@ public:
 
         if (m_Observer != nil) {
             [m_Observer stop];
+            [m_Observer release];
             m_Observer = nil;
         }
 
@@ -280,6 +274,10 @@ public:
 
     void showMetalHud(bool visible)
     {
+        if (![NSThread isMainThread]) {
+            m_MainThreadCall.run([this, visible] { showMetalHud(visible); });
+            return;
+        }
         if (!m_MetalLayer) {
             return;
         }
@@ -301,6 +299,11 @@ public:
                 };
             }
         }
+    }
+
+    virtual void prepareToStop() override
+    {
+        m_MainThreadCall.stop();
     }
 
     virtual bool isRenderThreadSupported() override {
@@ -442,6 +445,7 @@ public:
         paramBuffer.chromaOffset = simd_make_half2(chromaOffset[0],
                                                    chromaOffset[1]);
 
+        CAEDRMetadata* edrMetadata = nil;
         if (m_UseEDR && frame->color_trc == AVCOL_TRC_SMPTE2084) {
             // EDR requires a linear floating-point pixel format
             newPixelFormat = MTLPixelFormatRGBA16Float;
@@ -470,7 +474,7 @@ public:
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                             "EDR using user-selected min/max nits %.4f/%.2f, referenceWhite %.2f",
                             m_MinNits, m_MaxNits, m_ReferenceWhite);
-                m_MetalLayer.EDRMetadata = [CAEDRMetadata HDR10MetadataWithMinLuminance:m_MinNits
+                edrMetadata = [CAEDRMetadata HDR10MetadataWithMinLuminance:m_MinNits
                                                                            maxLuminance:m_MaxNits
                                                                      opticalOutputScale:m_ReferenceWhite];
             }
@@ -478,21 +482,23 @@ public:
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                             "EDR using MasteringDisplayColorVolume from host: min/max nits %.4f/%.2f, referenceWhite %.2f",
                             m_MinNits, m_MaxNits, m_ReferenceWhite);
-                m_MetalLayer.EDRMetadata = [CAEDRMetadata HDR10MetadataWithDisplayInfo:(__bridge NSData*)m_MasteringDisplayColorVolume
+                edrMetadata = [CAEDRMetadata HDR10MetadataWithDisplayInfo:(__bridge NSData*)m_MasteringDisplayColorVolume
                                                                            contentInfo:(__bridge NSData*)m_ContentLightLevelInfo
                                                                     opticalOutputScale:m_ReferenceWhite];
             }
         }
-        else {
-            m_MetalLayer.EDRMetadata = nullptr;
-        }
 
         // Set the new colorspace and pixelFormat, must be done on main thread
         // or we risk a "Deleted thread with uncommitted CATransaction" error when the render thread exits
-        dispatch_sync(dispatch_get_main_queue(), ^{
+        bool applied = m_MainThreadCall.run([this, newPixelFormat, newColorSpace, edrMetadata] {
+            m_MetalLayer.EDRMetadata = edrMetadata;
             m_MetalLayer.pixelFormat = newPixelFormat;
             m_MetalLayer.colorspace = newColorSpace;
         });
+        if (!applied) {
+            CGColorSpaceRelease(newColorSpace);
+            return false;
+        }
 
         // Get a new drawable if the pixel format was changed
         if (m_NeedNewDrawable) {
@@ -786,8 +792,13 @@ public:
         // avoid a crash at shutdown due to ImGui calling SDL
         // TODO; refactor this out to a parent class
         if (!FramePacer::instance().stopping()) {
+            // SDL window/cursor updates run on main; only Metal and ImGui run here.
+            SDL_Event event = {};
+            event.type = SDL_USEREVENT;
+            event.user.code = SDL_CODE_IMGUI_NEW_FRAME;
+            SDL_PushEvent(&event);
+            std::lock_guard<std::mutex> lock(ImGuiPlots::instance().contextMutex());
             ImGui_ImplMetal_NewFrame(m_RenderPassDescriptor);
-            ImGui_ImplSDL2_NewFrame();
             ImGui::NewFrame();
 
             // Dockspace is cool but overkill
@@ -817,6 +828,7 @@ public:
     { @autoreleasepool {
         auto commandBuffer = getCommandBuffer();
         auto drawable = nextDrawable(); // get cached drawable
+        if (!commandBuffer || !drawable) return;
 
         // We need to get the previous frame's pts that was attached by FrameCadence, in case that frame was dropped
         int64_t prevPts = 0;
@@ -827,20 +839,10 @@ public:
 
         // Warning: These callbacks must not use any member variables besides m_PresentState (using state->)
         auto state = m_PresentState;
-        // outstanding handlers: addPresentedHandler, addScheduledHandler, addCompletedHandler
-        state->callbacksInFlight.fetch_add(3);
 
         __block bool isNewFrame = prevPts > 0 && frame->pts != prevPts;
         [drawable addPresentedHandler:^(id<MTLDrawable> d) {
-            auto onExit = [state]() {
-                // this makes sure the destructor waits for us before exiting
-                if (state->callbacksInFlight.fetch_sub(1) > 0) {
-                    std::lock_guard<std::mutex> lock(state->callbacksMutex);
-                    state->callbacksCv.notify_all();
-                }
-            };
             if (state->stopping.load()) {
-                onExit();
                 return;
             }
 
@@ -892,8 +894,6 @@ public:
                 }
             });
         #endif
-
-            onExit();
         }];
 
         auto recordPresentedFrame = [state](const PresentedFrameInfo& pfi) {
@@ -1064,15 +1064,7 @@ public:
         // because presentation is queued when the command buffer is scheduled
         // (added to GPU queue), not when it completes.
         [commandBuffer addScheduledHandler:^(id<MTLCommandBuffer>) {
-            auto onExit = [state]() {
-                // this makes sure the destructor waits for us before exiting
-                if (state->callbacksInFlight.fetch_sub(1) > 0) {
-                    std::lock_guard<std::mutex> lock(state->callbacksMutex);
-                    state->callbacksCv.notify_all();
-                }
-            };
             if (state->stopping.load()) {
-                onExit();
                 return;
             }
 
@@ -1100,19 +1092,10 @@ public:
             }
 
             recordPresentedFrame(pfi);
-            onExit();
         }];
 
         [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-            auto onExit = [state]() {
-                // this makes sure the destructor waits for us before exiting
-                if (state->callbacksInFlight.fetch_sub(1) > 0) {
-                    std::lock_guard<std::mutex> lock(state->callbacksMutex);
-                    state->callbacksCv.notify_all();
-                }
-            };
             if (state->stopping.load()) {
-                onExit();
                 return;
             }
 
@@ -1121,8 +1104,6 @@ public:
             const double alpha = 0.25f;
             double avgGPUTime = (GPUTime * alpha) + (state->averageGPUTime.load() * (1.0 - alpha));
             state->averageGPUTime.store(avgGPUTime);
-
-            onExit();
         }];
 
         [commandBuffer commit];
@@ -1458,6 +1439,10 @@ public:
 
     void refreshWindowMetadata()
     {
+        if (![NSThread isMainThread]) {
+            m_MainThreadCall.run([this] { refreshWindowMetadata(); });
+            return;
+        }
         // Get the current window from SDL if it wasn't passed in
         NSWindow* nswindow = getNSWindow();
         if (nswindow) {
@@ -1483,6 +1468,7 @@ public:
             // visible, and it's better to pause in that situation.
             if (m_Observer != nil) {
                 [m_Observer stop];
+                [m_Observer release];
                 m_Observer = nil;
             }
             m_Observer = [[VTMetalObserver alloc] initWithRenderer:this forWindow:nswindow];
@@ -1702,7 +1688,7 @@ public:
 
         auto cfg = DevUISettings::instance().GetConfig();
         if (m_MaxFramesInFlight.load() != cfg.maxFramesInFlight) {
-            dispatch_sync(dispatch_get_main_queue(), ^{
+            m_MainThreadCall.run([this, cfg] {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Applied change of maxFramesInFlight to %d", cfg.maxFramesInFlight);
                 m_MaxFramesInFlight.store(cfg.maxFramesInFlight);
                 m_MetalLayer.maximumDrawableCount = std::clamp(cfg.maxFramesInFlight, 2, 3);
@@ -1730,7 +1716,7 @@ public:
                 vsyncEnabled = NO;
             }
             if (m_MetalLayer.displaySyncEnabled != vsyncEnabled) {
-                dispatch_sync(dispatch_get_main_queue(), ^{
+                m_MainThreadCall.run([this, vsyncEnabled] {
                     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Applied change of vsync to %d", vsyncEnabled);
                     m_MetalLayer.displaySyncEnabled = vsyncEnabled;
                     m_IsVsync.store(vsyncEnabled);
@@ -1838,6 +1824,7 @@ private:
     std::atomic<bool> m_IsVsync;
     std::atomic<double> m_VsyncTimestamp;
     std::atomic<double> m_VsyncDeadline;
+    MainThreadCall m_MainThreadCall;
     VTMetalObserver* m_Observer;
     bool m_IsGPUCapturing;
     id<CAMetalDrawable> m_Drawable;
@@ -1860,6 +1847,7 @@ IFFmpegRenderer* VTMetalRendererFactory::createRenderer(bool hwAccel) {
         _renderer = renderer;
 
         void (^pauseIfHidden)(NSNotification*) = ^(NSNotification *note) {
+            if (!_renderer) return;
             NSWindow* _window = (NSWindow *)note.object;
             bool shouldRender =
                 _window.isVisible &&
@@ -1869,6 +1857,7 @@ IFFmpegRenderer* VTMetalRendererFactory::createRenderer(bool hwAccel) {
         };
 
         void (^updateEDR)(NSNotification*) = ^(NSNotification *note) {
+            if (!_renderer) return;
             NSScreen* screen = [NSScreen mainScreen];
             _renderer->setCurrentEDR(screen);
         };
@@ -1876,12 +1865,12 @@ IFFmpegRenderer* VTMetalRendererFactory::createRenderer(bool hwAccel) {
         // Pause rendering when off screen or hidden
         _note = [[NSNotificationCenter defaultCenter] addObserverForName:NSWindowDidChangeOcclusionStateNotification
                                                                   object:window
-                                                                   queue:nil
+                                                                   queue:[NSOperationQueue mainQueue]
                                                               usingBlock:pauseIfHidden];
         // Watch for EDR changes
         _note2 = [[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidChangeScreenParametersNotification
                                                                    object:NSApp
-                                                                    queue:nil
+                                                                    queue:[NSOperationQueue mainQueue]
                                                                usingBlock:updateEDR];
     }
     return self;
@@ -1891,8 +1880,17 @@ IFFmpegRenderer* VTMetalRendererFactory::createRenderer(bool hwAccel) {
     if (_note) {
         [[NSNotificationCenter defaultCenter] removeObserver:_note];
         _note = nil;
+    }
+    if (_note2) {
+        [[NSNotificationCenter defaultCenter] removeObserver:_note2];
         _note2 = nil;
     }
+    _renderer = nullptr;
+}
+
+- (void)dealloc {
+    [self stop];
+    [super dealloc];
 }
 
 @end

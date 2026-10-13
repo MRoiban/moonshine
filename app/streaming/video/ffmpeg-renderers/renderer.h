@@ -197,6 +197,10 @@ public:
         // Nothing
     }
 
+    // Called on the main thread before joining the render thread. Cancel any
+    // work that needs the main thread so shutdown cannot deadlock on that join.
+    virtual void prepareToStop() {}
+
     // Called on the same thread as renderFrame() during destruction of the renderer
     virtual void cleanupRenderContext() {
         // Nothing

@@ -1,4 +1,5 @@
 #include "imgui_plots.h"
+#include "imgui_impl_sdl2.h"
 #include "plotdesc.h"
 #include "IconsFontAwesome7.h"
 #include "fa-solid-900.h"
@@ -66,6 +67,7 @@ float ImGuiPlots::observeFloatReturnAvg(int plotId, float value)
 
 void ImGuiPlots::ImGui_init(IFFmpegRenderer* renderer)
 {
+    std::lock_guard<std::mutex> lock(m_ContextMutex);
     // Setup ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -90,10 +92,12 @@ void ImGuiPlots::ImGui_init(IFFmpegRenderer* renderer)
     io.Fonts->AddFontFromMemoryCompressedTTF(FA_Solid_compressed_data, FA_Solid_compressed_size, 13.0f, &iconConfig);
 
     renderer->ImGui_initBackend();
+    if (io.BackendPlatformUserData) ImGui_ImplSDL2_NewFrame();
 }
 
 void ImGuiPlots::ImGui_deinit(IFFmpegRenderer* renderer)
 {
+    std::lock_guard<std::mutex> lock(m_ContextMutex);
     renderer->ImGui_deinitBackend();
 
     ImPlot::DestroyContext();

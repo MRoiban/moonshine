@@ -101,14 +101,13 @@ void CoreAudioRenderer::statsTrackRender(uint64_t startTimeUs, const AudioTimeSt
     // If no audio is playing, it's normal to get many underruns in a row.
     // We will only increment the underrun stat for the first empty buffer and
     // require some audio data before counting it again.
-    static bool seenAudio = true;
     if (didUnderrun) {
-        if (seenAudio) {
+        if (m_SeenAudio) {
             ++m_DropCountUnderrun;
-            seenAudio = false;
+            m_SeenAudio = false;
         }
     } else {
-        seenAudio = true;
+        m_SeenAudio = true;
     }
 
     // check for lost packets because we weren't called in time, possibly due to system overload
@@ -321,7 +320,7 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
 
     DevUISettings::instance().UpdateMetrics([&](DevUIMetrics& metrics) {
         metrics.opusChannelCount = m_opusConfig->channelCount;
-        strncpy(metrics.audioOutputDeviceName, m_OutputDeviceName, sizeof(metrics.audioOutputDeviceName));
+        SDL_strlcpy(metrics.audioOutputDeviceName, m_OutputDeviceName ? m_OutputDeviceName : "", sizeof(metrics.audioOutputDeviceName));
         metrics.audioFrameDurationMs = m_AudioPacketDuration * 1000;
         metrics.audioSampleRate = m_OutputASBD.mSampleRate;
         metrics.audioChannels = m_OutputASBD.mChannelsPerFrame;
@@ -340,14 +339,10 @@ bool CoreAudioRenderer::prepareForPlayback(const OPUS_MULTISTREAM_CONFIGURATION*
 void CoreAudioRenderer::updateMetrics()
 {
     DevUISettings::instance().UpdateMetrics([&](DevUIMetrics& metrics) {
-        metrics.audioDropCount += m_DropCount;
-        metrics.audioDropCountUnderrun += m_DropCountUnderrun;
+        metrics.audioDropCount += m_DropCount.exchange(0);
+        metrics.audioDropCountUnderrun += m_DropCountUnderrun.exchange(0);
         int bytesPerMs = (m_OutputASBD.mSampleRate * m_opusConfig->channelCount * sizeof(float)) / 1000;
         metrics.audioInBufferMs = (float)m_QueuedAudioSize.load() / bytesPerMs;
-
-        // Let DevUI reset the counters to 0
-        m_DropCount = 0;
-        m_DropCountUnderrun = 0;
     });
 }
 

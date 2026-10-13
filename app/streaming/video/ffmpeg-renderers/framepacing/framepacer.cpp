@@ -172,8 +172,20 @@ bool FramePacer::initialize(IFFmpegRenderer* renderer, PDECODER_PARAMETERS param
         }
     }
 
+#ifndef IMGUI_DISABLE
+    if (m_Renderer->isRenderThreadSupported()) {
+        // SDL platform backend owns cursors and window state: initialize on main.
+        ImGuiPlots::instance().ImGui_init(m_Renderer);
+        m_ImGuiInitialized = true;
+    }
+#endif
+
     if (m_Renderer->isRenderThreadSupported()) {
         m_RenderThread = SDL_CreateThread(FramePacer::renderThread, "FramePacerRender", this);
+        if (!m_RenderThread) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to create render thread: %s", SDL_GetError());
+            return false;
+        }
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "FramePacerRender thread started as thread ID %lu",
                     SDL_GetThreadID(m_RenderThread));
@@ -185,6 +197,14 @@ bool FramePacer::initialize(IFFmpegRenderer* renderer, PDECODER_PARAMETERS param
 void FramePacer::deinit()
 {
     m_Stopping.store(true);
+
+    if (m_Renderer) {
+        m_Renderer->prepareToStop();
+    }
+    if (m_VsyncSource) {
+        m_VsyncSource->stop();
+    }
+    m_WaitVsync.notify_all();
 
     // Stop and clear out FrameQueue
     FrameQueue::instance().stop();
@@ -201,6 +221,12 @@ void FramePacer::deinit()
             // Notify the main thread renderer that it is being destroyed soon
             m_Renderer->cleanupRenderContext();
         }
+#ifndef IMGUI_DISABLE
+        if (m_ImGuiInitialized) {
+            ImGuiPlots::instance().ImGui_deinit(m_Renderer);
+            m_ImGuiInitialized = false;
+        }
+#endif
         m_Renderer = nullptr;
     }
 
@@ -229,10 +255,6 @@ int FramePacer::renderThread(void* context)
     if (SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH) < 0) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unable to set render thread to high priority: %s", SDL_GetError());
     }
-
-#ifndef IMGUI_DISABLE
-    ImGuiPlots::instance().ImGui_init(me->m_Renderer);
-#endif
 
     // All timestamps in this function use Qpc
     // t0: top of loop
@@ -283,6 +305,7 @@ int FramePacer::renderThread(void* context)
 
         bool didRender = isImmediate ? me->renderModeImmediate() : me->renderModeDisplayLocked();
         t3 = QpcNow();
+        if (me->stopping()) break;
         if (!didRender) {
             // If Immediate mode, this means We're receiving a lower framerate and no frame was available,
             // we don't call Present here and the previous frame will be re-displayed by the OS.
@@ -385,10 +408,6 @@ int FramePacer::renderThread(void* context)
     // Notify the renderer that it is being destroyed soon
     // NB: This must happen on the same thread that calls renderFrame().
     me->m_Renderer->cleanupRenderContext();
-
-#ifndef IMGUI_DISABLE
-    ImGuiPlots::instance().ImGui_deinit(me->m_Renderer);
-#endif
 
     return 0;
 }
